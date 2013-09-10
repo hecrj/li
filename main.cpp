@@ -22,12 +22,7 @@ struct Literal
     uint id;
     vector<uint> normalClauses;
     vector<uint> negatedClauses;
-    
-    Literal()
-    {
-        normalClauses = vector<uint>();
-        negatedClauses = vector<uint>();
-    }
+    vector<uint> satisfiesClauses;
     
     int getOccurrences() const
     {
@@ -56,13 +51,15 @@ uint numClauses;
 uint indexOfNextLitToPropagate;
 uint decisionLevel;
 vector<Literal> literals;
+vector<int> literalOrder;
 vector< vector<int> > clauses;
+vector<bool> clausesSatisfied;
 vector<int> model;
 vector<int> modelStack;
 
-bool sortLiteralsByOccurrencesDesc(const Literal& a, const Literal& b)
+bool sortLiteralsByOccurrencesDesc(const int &a, const int &b)
 {
-    return a.getOccurrences() > b.getOccurrences();
+    return literals[a].getOccurrences() > literals[b].getOccurrences();
 }
 
 void readClauses()
@@ -81,10 +78,15 @@ void readClauses()
     
     // Init data structures
     clauses.resize(numClauses);
+    clausesSatisfied = vector<bool>(numClauses, false);
     literals = vector<Literal>(numVars + 1);
+    literalOrder = vector<int>(numVars + 1);
     
     for(int i = 1; i <= numVars; ++i)
+    {
         literals[i].id = i;
+        literalOrder[i] = i;
+    }
     
     // Read clauses
     for(uint i = 0; i < numClauses; ++i)
@@ -105,13 +107,13 @@ void readClauses()
     }
     
     // Sort literals by number of occurrences
-    sort(literals.begin(), literals.end(), sortLiteralsByOccurrencesDesc);
+    sort(literalOrder.begin(), literalOrder.end(), sortLiteralsByOccurrencesDesc);
     
 #ifdef DEBUG
     cout << "Literal info:" << endl;
     
     for(int i = 1; i <= numVars; ++i)
-        literals[i].print();
+        literals[literalOrder[i]].print();
 #endif
 }
 
@@ -126,47 +128,95 @@ int currentValueInModel(int lit)
     return 1 - model[-lit];
 }
 
+void addSatisfiedClauses(int id, const vector<uint> &toSatisfy)
+{
+    for(int i = 0; i < toSatisfy.size(); ++i)
+    {
+        if(!clausesSatisfied[toSatisfy[i]])
+        {
+            literals[id].satisfiesClauses.push_back(toSatisfy[i]);
+            clausesSatisfied[toSatisfy[i]] = true;
+        }
+    }
+}
+
+void removeSatisfiedClauses(int id)
+{
+    for(int i = 0; i < literals[id].satisfiesClauses.size(); ++i)
+        clausesSatisfied[literals[id].satisfiesClauses[i]] = false;
+    
+    literals[id].satisfiesClauses.clear();
+}
+
 void setLiteralToTrue(int lit)
 {
     modelStack.push_back(lit);
     
     if(lit > 0)
+    {
         model[lit] = TRUE;
+        addSatisfiedClauses(lit, literals[lit].normalClauses);
+    }
     else
+    {
         model[-lit] = FALSE;
+        addSatisfiedClauses(-lit, literals[-lit].negatedClauses);
+    }
+}
+
+bool propagateGivesConflict(const vector<uint> &propagationClauses)
+{   
+    for(uint i = 0; i < propagationClauses.size(); ++i)
+    {
+        int clause = propagationClauses[i];
+        
+        if(clausesSatisfied[clause])
+            continue;
+        
+        bool someLitTrue = false;
+        int numUndefs = 0;
+        int lastLitUndef = 0;
+
+        for(uint k = 0; not someLitTrue and k < clauses[clause].size(); ++k)
+        {
+            int val = currentValueInModel(clauses[clause][k]);
+
+            if(val == TRUE)
+                someLitTrue = true;
+            else if(val == UNDEF)
+            {
+                ++numUndefs;
+                lastLitUndef = clauses[clause][k];
+            }
+        }
+
+        if(not someLitTrue and numUndefs == 0)
+            return true; // conflict! all lits false
+
+        if(not someLitTrue and numUndefs == 1)
+            setLiteralToTrue(lastLitUndef);
+    }
+    
+    return false;
 }
 
 bool propagateGivesConflict()
 {
     while(indexOfNextLitToPropagate < modelStack.size())
     {
-        ++indexOfNextLitToPropagate;
+        int id = abs(modelStack[indexOfNextLitToPropagate]);
+        int value = model[id];
         
-        for(uint i = 0; i < numClauses; ++i)
+        if(value == TRUE)
         {
-            bool someLitTrue = false;
-            int numUndefs = 0;
-            int lastLitUndef = 0;
-            
-            for(uint k = 0; not someLitTrue and k < clauses[i].size(); ++k)
-            {
-                int val = currentValueInModel(clauses[i][k]);
-                
-                if(val == TRUE)
-                    someLitTrue = true;
-                else if(val == UNDEF)
-                {
-                    ++numUndefs;
-                    lastLitUndef = clauses[i][k];
-                }
-            }
-            
-            if(not someLitTrue and numUndefs == 0)
-                return true; // conflict! all lits false
-            
-            if(not someLitTrue and numUndefs == 1)
-                setLiteralToTrue(lastLitUndef);
+            // Using some immersion to avoid duplicated code!
+            if(propagateGivesConflict(literals[id].negatedClauses))
+                return true;
         }
+        else if(propagateGivesConflict(literals[id].normalClauses))
+            return true;
+        
+        ++indexOfNextLitToPropagate;
     }
     
     return false;
@@ -176,11 +226,15 @@ void backtrack()
 {
     uint i = modelStack.size() - 1;
     int lit = 0;
+    int id;
     
     while(modelStack[i] != 0) // 0 is the DL mark
     {
         lit = modelStack[i];
-        model[abs(lit)] = UNDEF;
+        id = abs(lit);
+        
+        removeSatisfiedClauses(id);
+        model[id] = UNDEF;
         modelStack.pop_back();
         --i;
     }
@@ -198,8 +252,8 @@ void backtrack()
 int getNextDecisionLiteral()
 {
     for(uint i = 1; i <= numVars; ++i) // stupid heuristic:
-        if(model[literals[i].id] == UNDEF)
-            return literals[i].id; // returns first UNDEF var, positively
+        if(model[literalOrder[i]] == UNDEF)
+            return literalOrder[i]; // returns first UNDEF var, positively
     
     return 0; // reurns 0 when all literals are defined
 }
