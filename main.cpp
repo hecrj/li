@@ -2,19 +2,68 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <vector>
+
 using namespace std;
 
 #define UNDEF -1
-#define TRUE 1
-#define FALSE 0
+#define TRUE   1
+#define FALSE  0
 
+void printVector(const vector<uint> &v)
+{
+    for(int i = 0; i < v.size(); ++i)
+        cout << v[i] << " ";
+    
+    cout << endl;
+}
+
+struct Literal
+{
+    uint id;
+    vector<uint> normalClauses;
+    vector<uint> negatedClauses;
+    
+    Literal()
+    {
+        normalClauses = vector<uint>();
+        negatedClauses = vector<uint>();
+    }
+    
+    int getOccurrences() const
+    {
+        return normalClauses.size() + negatedClauses.size();
+    }
+    
+    void print() const
+    {
+        cout << "----------------" << endl;
+        cout << "ID: " << id << endl;
+        cout << "Occurrences: " << getOccurrences() << endl;
+        
+        cout << "Normal clauses:" << endl;
+        cout << "    ";
+        printVector(normalClauses);
+        
+        cout << "Negated clauses:" << endl;
+        cout << "    ";
+        printVector(negatedClauses);
+    }
+};
+
+// App variables
 uint numVars;
 uint numClauses;
-vector<vector<int> > clauses;
-vector<int> model;
-vector<int> modelStack;
 uint indexOfNextLitToPropagate;
 uint decisionLevel;
+vector<Literal> literals;
+vector< vector<int> > clauses;
+vector<int> model;
+vector<int> modelStack;
+
+bool sortLiteralsByOccurrencesDesc(const Literal& a, const Literal& b)
+{
+    return a.getOccurrences() > b.getOccurrences();
+}
 
 void readClauses()
 {
@@ -29,15 +78,41 @@ void readClauses()
     // Read "cnf numVars numClauses"
     string aux;
     cin >> aux >> numVars >> numClauses;
+    
+    // Init data structures
     clauses.resize(numClauses);
+    literals = vector<Literal>(numVars + 1);
+    
+    for(int i = 1; i <= numVars; ++i)
+        literals[i].id = i;
     
     // Read clauses
     for(uint i = 0; i < numClauses; ++i)
     {
         int lit;
+        
         while(cin >> lit and lit != 0)
+        {
             clauses[i].push_back(lit);
+            
+            int lit_id = abs(lit);
+            
+            if(lit > 0)
+                literals[lit_id].normalClauses.push_back(i);
+            else
+                literals[lit_id].negatedClauses.push_back(i);
+        }
     }
+    
+    // Sort literals by number of occurrences
+    sort(literals.begin(), literals.end(), sortLiteralsByOccurrencesDesc);
+    
+#ifdef DEBUG
+    cout << "Literal info:" << endl;
+    
+    for(int i = 1; i <= numVars; ++i)
+        literals[i].print();
+#endif
 }
 
 int currentValueInModel(int lit)
@@ -123,8 +198,8 @@ void backtrack()
 int getNextDecisionLiteral()
 {
     for(uint i = 1; i <= numVars; ++i) // stupid heuristic:
-        if(model[i] == UNDEF)
-            return i; // returns first UNDEF var, positively
+        if(model[literals[i].id] == UNDEF)
+            return literals[i].id; // returns first UNDEF var, positively
     
     return 0; // reurns 0 when all literals are defined
 }
