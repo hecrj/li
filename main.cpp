@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <vector>
+#include <list>
 
 using namespace std;
 
@@ -9,10 +10,10 @@ using namespace std;
 #define TRUE   1
 #define FALSE  0
 
-void printVector(const vector<uint> &v)
+void printList(const list<uint> &v)
 {
-    for(int i = 0; i < v.size(); ++i)
-        cout << v[i] << " ";
+    for(list<uint>::const_iterator it = v.begin(); it != v.end(); ++it)
+        cout << *it << " ";
     
     cout << endl;
 }
@@ -20,28 +21,52 @@ void printVector(const vector<uint> &v)
 struct Literal
 {
     uint id;
-    vector<uint> normalClauses;
-    vector<uint> negatedClauses;
-    vector<uint> satisfiesClauses;
-    
-    int getOccurrences() const
-    {
-        return normalClauses.size() + negatedClauses.size();
-    }
+    list<uint> normalClausesWatched;
+    list<uint> negatedClausesWatched;
+    int occurrences;
     
     void print() const
     {
         cout << "----------------" << endl;
         cout << "ID: " << id << endl;
-        cout << "Occurrences: " << getOccurrences() << endl;
+        cout << "Occurrences: " << occurrences << endl;
         
         cout << "Normal clauses:" << endl;
         cout << "    ";
-        printVector(normalClauses);
+        printList(normalClausesWatched);
         
         cout << "Negated clauses:" << endl;
         cout << "    ";
-        printVector(negatedClauses);
+        printList(negatedClausesWatched);
+    }
+};
+
+struct Clause
+{
+    vector<int> literals;
+    int watchedLiteral1;
+    int watchedLiteral2;
+    
+    Clause()
+    {
+        watchedLiteral1 = 0;
+        watchedLiteral2 = 0;
+    }
+    
+    bool isWatched(int literal)
+    {
+        return (watchedLiteral1 == literal || watchedLiteral2 == literal);
+    }
+    
+    void replaceWatch(int oldWatch, int newWatch)
+    {
+        if(watchedLiteral1 == oldWatch)
+            watchedLiteral1 = newWatch;
+        else
+        {
+
+            watchedLiteral2 = newWatch;
+        }
     }
 };
 
@@ -50,16 +75,16 @@ uint numVars;
 uint numClauses;
 uint indexOfNextLitToPropagate;
 uint decisionLevel;
+
 vector<Literal> literals;
+vector<Clause> clauses;
 vector<int> literalOrder;
-vector< vector<int> > clauses;
-vector<bool> clausesSatisfied;
 vector<int> model;
 vector<int> modelStack;
 
 bool sortLiteralsByOccurrencesDesc(const int &a, const int &b)
 {
-    return literals[a].getOccurrences() > literals[b].getOccurrences();
+    return literals[a].occurrences > literals[b].occurrences;
 }
 
 void readClauses()
@@ -78,7 +103,6 @@ void readClauses()
     
     // Init data structures
     clauses.resize(numClauses);
-    clausesSatisfied = vector<bool>(numClauses, false);
     literals = vector<Literal>(numVars + 1);
     literalOrder = vector<int>(numVars + 1);
     
@@ -88,6 +112,7 @@ void readClauses()
         literalOrder[i] = i;
     }
     
+    int co = 0;
     // Read clauses
     for(uint i = 0; i < numClauses; ++i)
     {
@@ -95,14 +120,26 @@ void readClauses()
         
         while(cin >> lit and lit != 0)
         {
-            clauses[i].push_back(lit);
+            clauses[i].literals.push_back(lit);
             
             int lit_id = abs(lit);
             
-            if(lit > 0)
-                literals[lit_id].normalClauses.push_back(i);
-            else
-                literals[lit_id].negatedClauses.push_back(i);
+            if(clauses[i].watchedLiteral1 == 0 || clauses[i].watchedLiteral2 == 0)
+            {
+                if(lit > 0)
+                    literals[lit_id].normalClausesWatched.push_back(i);
+                else
+                    literals[lit_id].negatedClausesWatched.push_back(i);
+                
+                if(clauses[i].watchedLiteral1 == 0)
+                    clauses[i].watchedLiteral1 = lit;
+                else
+                    clauses[i].watchedLiteral2 = lit;
+                
+                co++;
+            }
+            
+            literals[lit_id].occurrences += 1;
         }
     }
     
@@ -128,73 +165,72 @@ int currentValueInModel(int lit)
     return 1 - model[-lit];
 }
 
-void addSatisfiedClauses(int id, const vector<uint> &toSatisfy)
-{
-    for(int i = 0; i < toSatisfy.size(); ++i)
-    {
-        if(!clausesSatisfied[toSatisfy[i]])
-        {
-            literals[id].satisfiesClauses.push_back(toSatisfy[i]);
-            clausesSatisfied[toSatisfy[i]] = true;
-        }
-    }
-}
-
-void removeSatisfiedClauses(int id)
-{
-    for(int i = 0; i < literals[id].satisfiesClauses.size(); ++i)
-        clausesSatisfied[literals[id].satisfiesClauses[i]] = false;
-    
-    literals[id].satisfiesClauses.clear();
-}
-
 void setLiteralToTrue(int lit)
 {
     modelStack.push_back(lit);
     
+    int id = abs(lit);
+    
     if(lit > 0)
-    {
-        model[lit] = TRUE;
-        addSatisfiedClauses(lit, literals[lit].normalClauses);
-    }
+        model[id] = TRUE;
     else
-    {
-        model[-lit] = FALSE;
-        addSatisfiedClauses(-lit, literals[-lit].negatedClauses);
-    }
+        model[id] = FALSE;
 }
 
-bool propagateGivesConflict(const vector<uint> &propagationClauses)
-{   
-    for(uint i = 0; i < propagationClauses.size(); ++i)
+bool propagateGivesConflict(int setLiteral, list<uint> &watchClauses)
+{
+    list<uint>::iterator it = watchClauses.begin();
+    
+    while(it != watchClauses.end())
     {
-        int clause = propagationClauses[i];
+        // Reference variable, just to avoid long names
+        Clause& clause = clauses[*it];
+        vector<int> undefLits;
         
-        if(clausesSatisfied[clause])
-            continue;
+        int lastVal = UNDEF;
         
-        bool someLitTrue = false;
-        int numUndefs = 0;
-        int lastLitUndef = 0;
-
-        for(uint k = 0; not someLitTrue and k < clauses[clause].size(); ++k)
+        for(uint k = 0; lastVal != TRUE and k < clause.literals.size(); ++k)
         {
-            int val = currentValueInModel(clauses[clause][k]);
-
-            if(val == TRUE)
-                someLitTrue = true;
-            else if(val == UNDEF)
-            {
-                ++numUndefs;
-                lastLitUndef = clauses[clause][k];
-            }
+            lastVal = currentValueInModel(clause.literals[k]);
+            
+            if(lastVal == UNDEF)
+                undefLits.push_back(clause.literals[k]);
         }
-
-        if(not someLitTrue and numUndefs == 0)
-            return true; // conflict! all lits false
-
-        if(not someLitTrue and numUndefs == 1)
-            setLiteralToTrue(lastLitUndef);
+        
+        if(lastVal == TRUE)
+        {
+            ++it;
+            continue;
+        }
+        
+        if(undefLits.size() == 0)
+            return true; // CONFLICT! Clause is false!
+        
+        if(undefLits.size() == 1)
+        {
+            setLiteralToTrue(undefLits[0]);
+            ++it;
+        }
+        else
+        {
+            // Find new watch literal
+            for(int i = 0; i < undefLits.size(); ++i)
+            {
+                if(!clause.isWatched(undefLits[i]))
+                {
+                    clause.replaceWatch(setLiteral, undefLits[i]);
+                    
+                    if(undefLits[i] > 0)
+                        literals[undefLits[i]].normalClausesWatched.push_back(*it);
+                    else
+                        literals[-undefLits[i]].negatedClausesWatched.push_back(*it);
+                    
+                    break;
+                }
+            }
+            
+            it = watchClauses.erase(it);
+        }
     }
     
     return false;
@@ -204,16 +240,16 @@ bool propagateGivesConflict()
 {
     while(indexOfNextLitToPropagate < modelStack.size())
     {
-        int id = abs(modelStack[indexOfNextLitToPropagate]);
-        int value = model[id];
-        
-        if(value == TRUE)
+        int lit = modelStack[indexOfNextLitToPropagate];
+        int id = abs(lit);
+
+        if(model[id] == TRUE)
         {
             // Using some immersion to avoid duplicated code!
-            if(propagateGivesConflict(literals[id].negatedClauses))
+            if(propagateGivesConflict(-id, literals[id].negatedClausesWatched))
                 return true;
         }
-        else if(propagateGivesConflict(literals[id].normalClauses))
+        else if(propagateGivesConflict(id, literals[id].normalClausesWatched))
             return true;
         
         ++indexOfNextLitToPropagate;
@@ -226,15 +262,11 @@ void backtrack()
 {
     uint i = modelStack.size() - 1;
     int lit = 0;
-    int id;
     
     while(modelStack[i] != 0) // 0 is the DL mark
     {
         lit = modelStack[i];
-        id = abs(lit);
-        
-        removeSatisfiedClauses(id);
-        model[id] = UNDEF;
+        model[abs(lit)] = UNDEF;
         modelStack.pop_back();
         --i;
     }
@@ -251,11 +283,11 @@ void backtrack()
 
 int getNextDecisionLiteral()
 {
-    for(uint i = 1; i <= numVars; ++i) // stupid heuristic:
+    for(uint i = 1; i <= numVars; ++i)
         if(model[literalOrder[i]] == UNDEF)
-            return literalOrder[i]; // returns first UNDEF var, positively
+            return literalOrder[i];
     
-    return 0; // reurns 0 when all literals are defined
+    return 0; // returns 0 when all literals are defined
 }
 
 void checkmodel()
@@ -264,15 +296,15 @@ void checkmodel()
     {
         bool someTrue = false;
         
-        for(int j = 0; not someTrue and j < clauses[i].size(); ++j)
-            someTrue = (currentValueInModel(clauses[i][j]) == TRUE);
+        for(int j = 0; not someTrue and j < clauses[i].literals.size(); ++j)
+            someTrue = (currentValueInModel(clauses[i].literals[j]) == TRUE);
         
         if(not someTrue)
         {
             cout << "Error in model, clause is not satisfied:";
             
-            for(int j = 0; j < clauses[i].size(); ++j)
-                cout << clauses[i][j] << " ";
+            for(int j = 0; j < clauses[i].literals.size(); ++j)
+                cout << clauses[i].literals[j] << " ";
             
             cout << endl;
             exit(1);
@@ -290,9 +322,9 @@ int main()
     // Take care of initial unit clauses, if any
     for(uint i = 0; i < numClauses; ++i)
     {
-        if(clauses[i].size() == 1)
+        if(clauses[i].literals.size() == 1)
         {
-            int lit = clauses[i][0];
+            int lit = clauses[i].literals[0];
             int val = currentValueInModel(lit);
             
             if(val == FALSE)
@@ -332,6 +364,7 @@ int main()
         modelStack.push_back(0); // push mark indicating new DL
         ++indexOfNextLitToPropagate;
         ++decisionLevel;
+        
         setLiteralToTrue(decisionLit); // now push decisionLit on top of the mark
     }
 }
