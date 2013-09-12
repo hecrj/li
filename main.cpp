@@ -9,6 +9,7 @@ using namespace std;
 #define UNDEF -1
 #define TRUE   1
 #define FALSE  0
+#define DEBUG
 
 void printList(const list<uint> &v)
 {
@@ -112,7 +113,6 @@ void readClauses()
         literalOrder[i] = i;
     }
     
-    int co = 0;
     // Read clauses
     for(uint i = 0; i < numClauses; ++i)
     {
@@ -135,8 +135,6 @@ void readClauses()
                     clauses[i].watchedLiteral1 = lit;
                 else
                     clauses[i].watchedLiteral2 = lit;
-                
-                co++;
             }
             
             literals[lit_id].occurrences += 1;
