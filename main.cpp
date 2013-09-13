@@ -11,6 +11,10 @@ using namespace std;
 #define FALSE  0
 #define DEBUG
 
+#ifdef __APPLE__
+    typedef unsigned int uint;
+#endif
+
 void printList(const list<uint> &v)
 {
     for(list<uint>::const_iterator it = v.begin(); it != v.end(); ++it)
