@@ -30,6 +30,12 @@ struct Literal
     list<uint> negatedClausesWatched;
     int occurrences;
     
+    Literal()
+    {
+        id = 0;
+        occurrences = 0;
+    }
+    
     void print() const
     {
         cout << "----------------" << endl;
