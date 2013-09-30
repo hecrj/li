@@ -9,7 +9,6 @@ using namespace std;
 #define UNDEF -1
 #define TRUE   1
 #define FALSE  0
-#define DEBUG
 
 #ifdef __APPLE__
     typedef unsigned int uint;
@@ -193,16 +192,23 @@ bool propagateGivesConflict(int setLiteral, list<uint> &watchClauses)
     {
         // Reference variable, just to avoid long names
         Clause& clause = clauses[*it];
-        vector<int> undefLits;
-        
+        int lastUndef = UNDEF;
+        int lastUnwatchedUndef = UNDEF;
         int lastVal = UNDEF;
+        int undefs = 0;
         
         for(uint k = 0; lastVal != TRUE and k < clause.literals.size(); ++k)
         {
             lastVal = currentValueInModel(clause.literals[k]);
             
-            if(lastVal == UNDEF)
-                undefLits.push_back(clause.literals[k]);
+            if(lastVal == UNDEF )
+            {
+                undefs++;
+                lastUndef = clause.literals[k];
+                
+                if(!clause.isWatched(clause.literals[k]))
+                    lastUnwatchedUndef = clause.literals[k];
+            }
         }
         
         if(lastVal == TRUE)
@@ -211,31 +217,22 @@ bool propagateGivesConflict(int setLiteral, list<uint> &watchClauses)
             continue;
         }
         
-        if(undefLits.size() == 0)
+        if(undefs == 0)
             return true; // CONFLICT! Clause is false!
         
-        if(undefLits.size() == 1)
+        if(undefs == 1)
         {
-            setLiteralToTrue(undefLits[0]);
+            setLiteralToTrue(lastUndef);
             ++it;
         }
         else
         {
-            // Find new watch literal
-            for(int i = 0; i < undefLits.size(); ++i)
-            {
-                if(!clause.isWatched(undefLits[i]))
-                {
-                    clause.replaceWatch(setLiteral, undefLits[i]);
-                    
-                    if(undefLits[i] > 0)
-                        literals[undefLits[i]].normalClausesWatched.push_back(*it);
-                    else
-                        literals[-undefLits[i]].negatedClausesWatched.push_back(*it);
-                    
-                    break;
-                }
-            }
+            clause.replaceWatch(setLiteral, lastUnwatchedUndef);
+            
+            if(lastUnwatchedUndef > 0)
+                literals[lastUnwatchedUndef].normalClausesWatched.push_back(*it);
+            else
+                literals[-lastUnwatchedUndef].negatedClausesWatched.push_back(*it);
             
             it = watchClauses.erase(it);
         }
