@@ -132,40 +132,14 @@ int currentValueInModel(int lit)
     return 1 - model[-lit];
 }
 
-void addSatisfiedClauses(int id, const vector<uint> &toSatisfy)
-{
-    for(int i = 0; i < toSatisfy.size(); ++i)
-    {
-        if(!clausesSatisfied[toSatisfy[i]])
-        {
-            literals[id].satisfiesClauses.push_back(toSatisfy[i]);
-            clausesSatisfied[toSatisfy[i]] = true;
-        }
-    }
-}
-
-void removeSatisfiedClauses(int id)
-{
-    for(int i = 0; i < literals[id].satisfiesClauses.size(); ++i)
-        clausesSatisfied[literals[id].satisfiesClauses[i]] = false;
-    
-    literals[id].satisfiesClauses.clear();
-}
-
 void setLiteralToTrue(int lit)
 {
     modelStack.push_back(lit);
     
     if(lit > 0)
-    {
         model[lit] = TRUE;
-        addSatisfiedClauses(lit, literals[lit].normalClauses);
-    }
     else
-    {
         model[-lit] = FALSE;
-        addSatisfiedClauses(-lit, literals[-lit].negatedClauses);
-    }
 }
 
 bool propagateGivesConflict(const vector<uint> &propagationClauses)
@@ -173,9 +147,6 @@ bool propagateGivesConflict(const vector<uint> &propagationClauses)
     for(uint i = 0; i < propagationClauses.size(); ++i)
     {
         int clause = propagationClauses[i];
-        
-        if(clausesSatisfied[clause])
-            continue;
         
         bool someLitTrue = false;
         int numUndefs = 0;
@@ -237,7 +208,6 @@ void backtrack()
         lit = modelStack[i];
         id = abs(lit);
         
-        removeSatisfiedClauses(id);
         model[id] = UNDEF;
         modelStack.pop_back();
         --i;
