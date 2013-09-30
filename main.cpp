@@ -25,8 +25,6 @@ void printList(const list<uint> &v)
 struct Literal
 {
     uint id;
-    list<uint> normalClausesWatched;
-    list<uint> negatedClausesWatched;
     int occurrences;
     
     Literal()
@@ -40,14 +38,6 @@ struct Literal
         cout << "----------------" << endl;
         cout << "ID: " << id << endl;
         cout << "Occurrences: " << occurrences << endl;
-        
-        cout << "Normal clauses:" << endl;
-        cout << "    ";
-        printList(normalClausesWatched);
-        
-        cout << "Negated clauses:" << endl;
-        cout << "    ";
-        printList(negatedClausesWatched);
     }
 };
 
@@ -70,11 +60,14 @@ uint indexOfNextLitToPropagate;
 uint decisionLevel;
 
 vector<Literal> literals;
+vector< list<uint> > watches;
 vector<Clause> clauses;
 vector<Clause> learntClauses;
 vector<int> literalOrder;
 vector<int> model;
 vector<int> modelStack;
+
+#define index(lit) lit < 0 ? -lit + numVars : lit
 
 bool sortLiteralsByOccurrencesDesc(const int &a, const int &b)
 {
@@ -98,6 +91,7 @@ void readClauses()
     // Init data structures
     clauses.resize(numClauses);
     literals = vector<Literal>(numVars + 1);
+    watches = vector< list<uint> >(numVars*2 + 1);
     literalOrder = vector<int>(numVars + 1);
     
     for(int i = 1; i <= numVars; ++i)
@@ -120,12 +114,7 @@ void readClauses()
             int lit_id = abs(lit);
             
             if(clauses[i].literals.size() <= 2)
-            {
-                if(lit > 0)
-                    literals[lit_id].normalClausesWatched.push_back(i);
-                else
-                    literals[lit_id].negatedClausesWatched.push_back(i);
-            }
+                watches[index(-lit)].push_back(i);
             
             literals[lit_id].occurrences += 1;
         }
@@ -173,11 +162,8 @@ bool findNewWatcher(int literal, Clause &clause)
         {
             clause.literals[1] = clause.literals[i];
             clause.literals[i] = literal;
-
-            if(clause.literals[1] > 0)
-                literals[clause.literals[1]].normalClausesWatched.push_back(clause.id);
-            else
-                literals[-clause.literals[1]].negatedClausesWatched.push_back(clause.id);
+            
+            watches[index(-clause.literals[1])].push_back(clause.id);
 
             return true;
         }
@@ -231,15 +217,8 @@ bool propagateGivesConflict()
     while(indexOfNextLitToPropagate < modelStack.size())
     {
         int lit = modelStack[indexOfNextLitToPropagate];
-        int id = abs(lit);
-
-        if(model[id] == TRUE)
-        {
-            // Using some immersion to avoid duplicated code!
-            if(propagateGivesConflict(-id, literals[id].negatedClausesWatched))
-                return true;
-        }
-        else if(propagateGivesConflict(id, literals[id].normalClausesWatched))
+        
+        if(propagateGivesConflict(-lit, watches[index(lit)]))
             return true;
         
         ++indexOfNextLitToPropagate;
