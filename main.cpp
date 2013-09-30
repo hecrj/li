@@ -53,31 +53,14 @@ struct Literal
 
 struct Clause
 {
+    uint id;
     vector<int> literals;
-    int watchedLiteral1;
-    int watchedLiteral2;
     
     Clause()
     {
-        watchedLiteral1 = 0;
-        watchedLiteral2 = 0;
+        id = 0;
     }
     
-    bool isWatched(int literal)
-    {
-        return (watchedLiteral1 == literal || watchedLiteral2 == literal);
-    }
-    
-    void replaceWatch(int oldWatch, int newWatch)
-    {
-        if(watchedLiteral1 == oldWatch)
-            watchedLiteral1 = newWatch;
-        else
-        {
-
-            watchedLiteral2 = newWatch;
-        }
-    }
 };
 
 // App variables
@@ -88,6 +71,7 @@ uint decisionLevel;
 
 vector<Literal> literals;
 vector<Clause> clauses;
+vector<Clause> learntClauses;
 vector<int> literalOrder;
 vector<int> model;
 vector<int> modelStack;
@@ -125,6 +109,8 @@ void readClauses()
     // Read clauses
     for(uint i = 0; i < numClauses; ++i)
     {
+        clauses[i].id = i;
+        
         int lit;
         
         while(cin >> lit and lit != 0)
@@ -133,17 +119,12 @@ void readClauses()
             
             int lit_id = abs(lit);
             
-            if(clauses[i].watchedLiteral1 == 0 || clauses[i].watchedLiteral2 == 0)
+            if(clauses[i].literals.size() <= 2)
             {
                 if(lit > 0)
                     literals[lit_id].normalClausesWatched.push_back(i);
                 else
                     literals[lit_id].negatedClausesWatched.push_back(i);
-                
-                if(clauses[i].watchedLiteral1 == 0)
-                    clauses[i].watchedLiteral1 = lit;
-                else
-                    clauses[i].watchedLiteral2 = lit;
             }
             
             literals[lit_id].occurrences += 1;
@@ -184,58 +165,62 @@ void setLiteralToTrue(int lit)
         model[id] = FALSE;
 }
 
-bool propagateGivesConflict(int setLiteral, list<uint> &watchClauses)
+bool findNewWatcher(int literal, Clause &clause)
+{
+    for(int i = 2; i < clause.literals.size(); ++i)
+    {
+        if(currentValueInModel(clause.literals[i]) != FALSE)
+        {
+            clause.literals[1] = clause.literals[i];
+            clause.literals[i] = literal;
+
+            if(clause.literals[1] > 0)
+                literals[clause.literals[1]].normalClausesWatched.push_back(clause.id);
+            else
+                literals[-clause.literals[1]].negatedClausesWatched.push_back(clause.id);
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool propagateGivesConflict(int literal, list<uint> &watchClauses)
 {
     list<uint>::iterator it = watchClauses.begin();
     
     while(it != watchClauses.end())
     {
-        // Reference variable, just to avoid long names
-        Clause& clause = clauses[*it];
-        int lastUndef = UNDEF;
-        int lastUnwatchedUndef = UNDEF;
-        int lastVal = UNDEF;
-        int undefs = 0;
+        Clause &clause = clauses[*it];
         
-        for(uint k = 0; lastVal != TRUE and k < clause.literals.size(); ++k)
+        // Make sure false literal is at second position
+        if(clause.literals[0] == literal)
         {
-            lastVal = currentValueInModel(clause.literals[k]);
-            
-            if(lastVal == UNDEF )
-            {
-                undefs++;
-                lastUndef = clause.literals[k];
-                
-                if(!clause.isWatched(clause.literals[k]))
-                    lastUnwatchedUndef = clause.literals[k];
-            }
+            clause.literals[0] = clause.literals[1];
+            clause.literals[1] = literal;
         }
         
-        if(lastVal == TRUE)
+        int firstWatchValue = currentValueInModel(clause.literals[0]);
+        
+        // If first watch is true, then clause is satisfied
+        if(firstWatchValue == TRUE)
         {
             ++it;
             continue;
         }
         
-        if(undefs == 0)
-            return true; // CONFLICT! Clause is false!
-        
-        if(undefs == 1)
+        if(findNewWatcher(literal, clause))
         {
-            setLiteralToTrue(lastUndef);
-            ++it;
-        }
-        else
-        {
-            clause.replaceWatch(setLiteral, lastUnwatchedUndef);
-            
-            if(lastUnwatchedUndef > 0)
-                literals[lastUnwatchedUndef].normalClausesWatched.push_back(*it);
-            else
-                literals[-lastUnwatchedUndef].negatedClausesWatched.push_back(*it);
-            
             it = watchClauses.erase(it);
+            continue;
         }
+        
+        if(firstWatchValue == FALSE)
+            return true;
+        
+        setLiteralToTrue(clause.literals[0]); // Propagate
+        ++it;
     }
     
     return false;
