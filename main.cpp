@@ -67,7 +67,7 @@ vector<int> literalOrder;
 vector<int> model;
 vector<int> modelStack;
 
-#define index(lit) lit < 0 ? -lit + numVars : lit
+#define index(lit) lit + numVars
 
 bool sortLiteralsByOccurrencesDesc(const int &a, const int &b)
 {
