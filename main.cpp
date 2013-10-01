@@ -13,14 +13,40 @@ using namespace std;
 #ifdef __APPLE__
     typedef unsigned int uint;
 #endif
-
-void printList(const list<uint> &v)
-{
-    for(list<uint>::const_iterator it = v.begin(); it != v.end(); ++it)
-        cout << *it << " ";
     
-    cout << endl;
-}
+/**
+ * GLOBAL VARIABLES
+ */
+uint numVars;
+uint numClauses;
+uint indexOfNextLitToPropagate;
+uint decisionLevel;
+
+struct Variable;
+struct Clause;
+
+vector<Variable> variables;
+vector< list<uint> > watches;
+vector<Clause> clauses;
+vector<int> model;
+vector<int> modelStack;
+
+
+struct Variable
+{
+    uint id;
+    uint occurrences;
+    uint level;
+    uint reasonClause;
+    
+    Variable()
+    {
+        id = 0;
+        occurrences = 0;
+        level = -1;
+        reasonClause = -1;
+    }
+};
 
 struct Clause
 {
@@ -34,26 +60,13 @@ struct Clause
     
 };
 
-// App variables
-uint numVars;
-uint numClauses;
-uint indexOfNextLitToPropagate;
-uint decisionLevel;
-
-vector<uint> variables;
-vector<uint> occurrences;
-vector< list<uint> > watches;
-vector<Clause> clauses;
-vector<Clause> learntClauses;
-vector<int> model;
-vector<int> modelStack;
-
 #define index(lit) lit + numVars
-#define var(lit) lit < 0 ? -lit : lit
+#define var(lit)   abs(lit)
+#define max(x, y)  x > y ? x : y   
 
-bool sortLiteralsByOccurrencesDesc(const int &a, const int &b)
+bool sortLiteralsByOccurrencesDesc(const Variable &a, const Variable &b)
 {
-    return occurrences[a] > occurrences[b];
+    return a.occurrences > b.occurrences;
 }
 
 void readClauses()
@@ -73,14 +86,10 @@ void readClauses()
     // Init data structures
     clauses.resize(numClauses);
     variables.resize(numVars + 1);
-    occurrences.resize(numVars + 1);
     watches.resize(numVars*2 + 1);
     
     for(int i = 1; i <= numVars; ++i)
-    {
-        variables[i] = i;
-        occurrences[i] = 0;
-    }
+        variables[i].id = i;
     
     // Read clauses
     for(uint i = 0; i < numClauses; ++i)
@@ -96,7 +105,7 @@ void readClauses()
             if(clauses[i].literals.size() <= 2)
                 watches[index(-lit)].push_back(i);
             
-            occurrences[var(lit)]++;
+            variables[var(lit)].occurrences++;
         }
     }
     
@@ -132,6 +141,8 @@ void setLiteralToTrue(int lit)
         model[id] = TRUE;
     else
         model[id] = FALSE;
+    
+    variables[var(lit)].level = decisionLevel;
 }
 
 bool findNewWatcher(int literal, Clause &clause)
@@ -152,7 +163,7 @@ bool findNewWatcher(int literal, Clause &clause)
     return false;
 }
 
-bool propagateGivesConflict(int literal, list<uint> &watchClauses)
+bool propagateGivesConflict(int literal, list<uint> &watchClauses, int &conflictClause)
 {
     list<uint>::iterator it = watchClauses.begin();
     
@@ -183,22 +194,26 @@ bool propagateGivesConflict(int literal, list<uint> &watchClauses)
         }
         
         if(firstWatchValue == FALSE)
+        {
+            conflictClause = *it;
             return true;
+        }
         
         setLiteralToTrue(clause.literals[0]); // Propagate
+        variables[var(clause.literals[0])].reasonClause = *it;
         ++it;
     }
     
     return false;
 }
 
-bool propagateGivesConflict()
+bool propagateGivesConflict(int &conflictClause)
 {
     while(indexOfNextLitToPropagate < modelStack.size())
     {
         int lit = modelStack[indexOfNextLitToPropagate];
         
-        if(propagateGivesConflict(-lit, watches[index(lit)]))
+        if(propagateGivesConflict(-lit, watches[index(lit)], conflictClause))
             return true;
         
         ++indexOfNextLitToPropagate;
@@ -207,34 +222,105 @@ bool propagateGivesConflict()
     return false;
 }
 
-void backtrack()
+
+void undoOne()
 {
-    uint i = modelStack.size() - 1;
-    int lit = 0;
+    int lit = modelStack.back();
+    int x = var(lit);
     
-    while(modelStack[i] != 0) // 0 is the DL mark
+    variables[x].level = -1;
+    variables[x].reasonClause = -1;
+    model[x] = UNDEF;
+    modelStack.pop_back();
+    
+    if(modelStack.back() == 0)
     {
-        lit = modelStack[i];
-        model[abs(lit)] = UNDEF;
-        modelStack.pop_back();
-        --i;
+        modelStack.pop_back(); // remove the DL mark
+        --decisionLevel;
     }
     
-    // at this point, lit is the last decision
-    modelStack.pop_back(); // remove the DL mark
-    --decisionLevel;
     indexOfNextLitToPropagate = modelStack.size();
-    setLiteralToTrue(-lit); // reverse last decision
 }
 
+void backtrack(int level)
+{
+    while(decisionLevel > level)
+        undoOne();
+}
+
+void calcReason(int conflict, int lit, vector<int> &reason)
+{
+    Clause &c = clauses[conflict];
+    
+    for(int i = (lit == UNDEF ? 0 : 1); i < c.literals.size(); ++i)
+        reason.push_back(-c.literals[i]);
+}
+
+void analyze(int conflict, Clause &learnt, int btLevel)
+{
+    vector<bool> seen(numVars + 1, false);
+    int counter = 0;
+    int lit = UNDEF;
+    vector<int> lit_reason;
+    
+    btLevel = 0;
+    learnt.literals.push_back(0);
+    
+    do
+    {
+        lit_reason.clear();
+        calcReason(conflict, lit, lit_reason);
+        
+        for(int i = 0; i < lit_reason.size(); ++i)
+        {
+            int q = lit_reason[i];
+            Variable& vq = variables[var(q)];
+            
+            if(not seen[var(q)])
+            {
+                seen[var(q)] = true;
+                
+                if(vq.level == decisionLevel)
+                    counter++;
+                else if(vq.level > 0)
+                {
+                    learnt.literals.push_back(-q);
+                    btLevel = max(btLevel, vq.level);
+                }
+            }
+        }
+        
+        do
+        {
+            lit = modelStack.back();
+            conflict = variables[var(lit)].reasonClause;
+            undoOne();
+        }
+        while(not seen[var(lit)]);
+        
+        counter--;
+    }
+    while(counter > 0);
+    
+    learnt.literals[0] = -lit;
+}
+
+void learn(Clause &clause)
+{
+    clause.id = clauses.size();
+    clauses.push_back(clause);
+    watches[index(clause.literals[0])].push_back(clause.id);
+    watches[index(clause.literals[1])].push_back(clause.id);
+    setLiteralToTrue(clause.literals[0]);
+}
 
 // Heuristic for finding the next decision literal:
 
 int getNextDecisionLiteral()
 {
     for(uint i = 1; i <= numVars; ++i)
-        if(model[variables[i]] == UNDEF)
-            return variables[i];
+        if(model[variables[i].id] == UNDEF)
+            return variables[i].id;
     
     return 0; // returns 0 when all literals are defined
 }
@@ -285,11 +371,14 @@ int main()
                 setLiteralToTrue(lit);
         }
     }
-
+    
+    int conflictClause;
+    int backtrackLevel;
+    
     // DPLL algorithm
     while(true)
     {
-        while(propagateGivesConflict())
+        while(propagateGivesConflict(conflictClause))
         {
             if(decisionLevel == 0)
             {
@@ -297,7 +386,10 @@ int main()
                 return 10;
             }
             
-            backtrack();
+            Clause learntClause;
+            analyze(conflictClause, learntClause, backtrackLevel);
+            backtrack(backtrackLevel);
+            learn(learntClause);
         }
         
         int decisionLit = getNextDecisionLiteral();
