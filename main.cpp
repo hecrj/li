@@ -32,6 +32,9 @@ vector<int> model;
 vector<int> modelStack;
 
 
+/**
+ * CLASSES
+ */
 struct Variable
 {
     uint id;
@@ -52,14 +55,11 @@ struct Clause
 {
     uint id;
     vector<int> literals;
-    
-    Clause()
-    {
-        id = 0;
-    }
-    
 };
 
+/**
+ * Useful definitions
+ */
 #define index(lit) lit + numVars
 #define var(lit)   abs(lit)
 #define max(x, y)  x > y ? x : y   
@@ -67,6 +67,14 @@ struct Clause
 bool sortLiteralsByOccurrencesDesc(const Variable &a, const Variable &b)
 {
     return a.occurrences > b.occurrences;
+}
+
+template<class T> void print(vector<T> &v)
+{
+    for(int i = 0; i < v.size(); ++i)
+        cout << v[i] << ' ';
+    
+    cout << endl;
 }
 
 void readClauses()
@@ -111,13 +119,6 @@ void readClauses()
     
     // Sort literals by number of occurrences
     sort(variables.begin(), variables.end(), sortLiteralsByOccurrencesDesc);
-    
-#ifdef DEBUG
-    cout << "Literal info:" << endl;
-    
-    for(int i = 1; i <= numVars; ++i)
-        literals[literalOrder[i]].print();
-#endif
 }
 
 int currentValueInModel(int lit)
@@ -222,16 +223,15 @@ bool propagateGivesConflict(int &conflictClause)
     return false;
 }
 
-
 void undoOne()
 {
     int lit = modelStack.back();
     int x = var(lit);
+    modelStack.pop_back();
     
     variables[x].level = -1;
     variables[x].reasonClause = -1;
     model[x] = UNDEF;
-    modelStack.pop_back();
     
     if(modelStack.back() == 0)
     {
@@ -256,7 +256,7 @@ void calcReason(int conflict, int lit, vector<int> &reason)
         reason.push_back(-c.literals[i]);
 }
 
-void analyze(int conflict, Clause &learnt, int btLevel)
+void analyze(int conflict, Clause &learnt, int &btLevel)
 {
     vector<bool> seen(numVars + 1, false);
     int counter = 0;
@@ -304,17 +304,19 @@ void analyze(int conflict, Clause &learnt, int btLevel)
     
     learnt.literals[0] = -lit;
 }
-
+    
 void learn(Clause &clause)
 {
     clause.id = clauses.size();
     clauses.push_back(clause);
-    watches[index(clause.literals[0])].push_back(clause.id);
-    watches[index(clause.literals[1])].push_back(clause.id);
+    watches[index(-clause.literals[0])].push_back(clause.id);
+    
+    if(clause.literals.size() > 1)
+        watches[index(-clause.literals[1])].push_back(clause.id);
+    
+    variables[var(clause.literals[0])].reasonClause = clause.id;
     setLiteralToTrue(clause.literals[0]);
 }
-
-// Heuristic for finding the next decision literal:
 
 int getNextDecisionLiteral()
 {
