@@ -22,25 +22,6 @@ void printList(const list<uint> &v)
     cout << endl;
 }
 
-struct Literal
-{
-    uint id;
-    int occurrences;
-    
-    Literal()
-    {
-        id = 0;
-        occurrences = 0;
-    }
-    
-    void print() const
-    {
-        cout << "----------------" << endl;
-        cout << "ID: " << id << endl;
-        cout << "Occurrences: " << occurrences << endl;
-    }
-};
-
 struct Clause
 {
     uint id;
@@ -59,19 +40,20 @@ uint numClauses;
 uint indexOfNextLitToPropagate;
 uint decisionLevel;
 
-vector<Literal> literals;
+vector<uint> variables;
+vector<uint> occurrences;
 vector< list<uint> > watches;
 vector<Clause> clauses;
 vector<Clause> learntClauses;
-vector<int> literalOrder;
 vector<int> model;
 vector<int> modelStack;
 
 #define index(lit) lit + numVars
+#define var(lit) lit < 0 ? -lit : lit
 
 bool sortLiteralsByOccurrencesDesc(const int &a, const int &b)
 {
-    return literals[a].occurrences > literals[b].occurrences;
+    return occurrences[a] > occurrences[b];
 }
 
 void readClauses()
@@ -90,14 +72,14 @@ void readClauses()
     
     // Init data structures
     clauses.resize(numClauses);
-    literals = vector<Literal>(numVars + 1);
-    watches = vector< list<uint> >(numVars*2 + 1);
-    literalOrder = vector<int>(numVars + 1);
+    variables.resize(numVars + 1);
+    occurrences.resize(numVars + 1);
+    watches.resize(numVars*2 + 1);
     
     for(int i = 1; i <= numVars; ++i)
     {
-        literals[i].id = i;
-        literalOrder[i] = i;
+        variables[i] = i;
+        occurrences[i] = 0;
     }
     
     // Read clauses
@@ -111,17 +93,15 @@ void readClauses()
         {
             clauses[i].literals.push_back(lit);
             
-            int lit_id = abs(lit);
-            
             if(clauses[i].literals.size() <= 2)
                 watches[index(-lit)].push_back(i);
             
-            literals[lit_id].occurrences += 1;
+            occurrences[var(lit)]++;
         }
     }
     
     // Sort literals by number of occurrences
-    sort(literalOrder.begin(), literalOrder.end(), sortLiteralsByOccurrencesDesc);
+    sort(variables.begin(), variables.end(), sortLiteralsByOccurrencesDesc);
     
 #ifdef DEBUG
     cout << "Literal info:" << endl;
@@ -253,8 +233,8 @@ void backtrack()
 int getNextDecisionLiteral()
 {
     for(uint i = 1; i <= numVars; ++i)
-        if(model[literalOrder[i]] == UNDEF)
-            return literalOrder[i];
+        if(model[variables[i]] == UNDEF)
+            return variables[i];
     
     return 0; // returns 0 when all literals are defined
 }
