@@ -17,10 +17,10 @@ using namespace std;
 /**
  * Useful definitions
  */
-#define index(lit) lit + numVars
-#define var(lit)   abs(lit)
-#define max(x, y)  x > y ? x : y
-#define learntClauses (int)(clauses.size() - numClauses - modelStack.size() + decisionLevel)
+#define index(lit)              lit + numVars
+#define var(lit)                abs(lit)
+#define max(x, y)               x > y ? x : y
+#define numLearntClauses()      (int)(learntClauses.size() - modelStack.size() + decisionLevel)
 
 /**
  * Config definitions
@@ -40,6 +40,7 @@ struct Clause;
 
 vector<Variable> variables;
 vector<Clause*> clauses;
+vector<Clause*> learntClauses;
 
 vector< list<Clause*> > watches;
 vector<int> variableOrder;
@@ -60,6 +61,11 @@ struct Variable
     
     Variable() : occurrences(0), level(-1), reasonClause(NULL)
     { }
+    
+    static bool sortByOccurrencesAsc(const int &a, const int &b)
+    {
+        return variables[a].occurrences > variables[b].occurrences;
+    }
 };
 
 struct Clause
@@ -122,12 +128,7 @@ struct Clause
         
         return a->activity > b->activity;
     }
-};  
-
-bool sortLiteralsByOccurrencesDesc(const int &a, const int &b)
-{
-    return variables[a].occurrences > variables[b].occurrences;
-}
+};
 
 template<class T> void print(vector<T> &v)
 {
@@ -180,7 +181,7 @@ void readClauses()
     }
     
     // Sort literals by number of occurrences
-    sort(variableOrder.begin(), variableOrder.end(), sortLiteralsByOccurrencesDesc);
+    sort(variableOrder.begin(), variableOrder.end(), Variable::sortByOccurrencesAsc);
 }
 
 int currentValueInModel(int lit)
@@ -354,7 +355,7 @@ void learn(Clause* clause)
         watches[index(-clause->literals[1])].push_back(clause);
         variables[var(clause->literals[0])].reasonClause = clause;
         
-        clauses.push_back(clause);
+        learntClauses.push_back(clause);
     }
     
     setLiteralToTrue(clause->literals[0]);
@@ -394,18 +395,18 @@ void checkmodel()
 void reduceLearntClauses()
 {
     // Reorder clauses
-    sort(clauses.begin() + numClauses, clauses.end(), Clause::sortByActivityDesc);
+    sort(learntClauses.begin(), learntClauses.end(), Clause::sortByActivityDesc);
     
     int remove = MAX_LEARNT_CLAUSES / 2; // Remove the half part
     int i = 0;
     
-    Clause* clause = clauses.back();
+    Clause* clause = learntClauses.back();
     while(i < remove and not clause->locked())
     {
-        clauses.pop_back();
+        learntClauses.pop_back();
         clause->remove();
         
-        clause = clauses.back();
+        clause = learntClauses.back();
         i++;
     }
 }
@@ -454,7 +455,7 @@ int main()
             learn(learntClause);
         }
         
-        if(learntClauses > MAX_LEARNT_CLAUSES)
+        if(numLearntClauses() > MAX_LEARNT_CLAUSES)
             reduceLearntClauses();
             
         int decisionLit = getNextDecisionLiteral();
