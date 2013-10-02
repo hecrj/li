@@ -93,7 +93,7 @@ class Tester(object):
 
     def _compile(self):
         self.info("Compiling %s..." % self.program)
-        cmd = subprocess.call(['g++', '-O2', '-o', self.exec_name, self.program])
+        cmd = subprocess.call(['g++', '-O3', '-o', self.exec_name, self.program])
         if cmd != 0:
             self.error("error\n")
         else:

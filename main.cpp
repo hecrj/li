@@ -13,6 +13,19 @@ using namespace std;
 #ifdef __APPLE__
     typedef unsigned int uint;
 #endif
+   
+/**
+ * Useful definitions
+ */
+#define index(lit) lit + numVars
+#define var(lit)   abs(lit)
+#define max(x, y)  x > y ? x : y
+#define learntClauses (int)(clauses.size() - numClauses - modelStack.size() + decisionLevel)
+
+/**
+ * Config definitions
+ */
+#define MAX_LEARNT_CLAUSES 300
     
 /**
  * GLOBAL VARIABLES
@@ -26,11 +39,14 @@ struct Variable;
 struct Clause;
 
 vector<Variable> variables;
-vector< list<uint> > watches;
-vector<Clause> clauses;
+vector<Clause*> clauses;
+
+vector< list<Clause*> > watches;
+vector<int> variableOrder;
 vector<int> model;
 vector<int> modelStack;
 
+int currentValueInModel(int lit);
 
 /**
  * CLASSES
@@ -40,33 +56,77 @@ struct Variable
     uint id;
     uint occurrences;
     uint level;
-    uint reasonClause;
+    Clause* reasonClause;
     
-    Variable()
-    {
-        id = 0;
-        occurrences = 0;
-        level = -1;
-        reasonClause = -1;
-    }
+    Variable() : occurrences(0), level(-1), reasonClause(NULL)
+    { }
 };
 
 struct Clause
 {
-    uint id;
     vector<int> literals;
-};
+    float activity;
+    
+    Clause() : activity(0)
+    { }
+    
+    ~Clause() { }
+    
+    bool locked() const
+    {
+        return variables[var(literals[0])].reasonClause == this;
+    }
+    
+    bool findNewWatcher(int literal)
+    {
+        for(int i = 2; i < literals.size(); ++i)
+        {
+            if(currentValueInModel(literals[i]) != FALSE)
+            {
+                literals[1] = literals[i];
+                literals[i] = literal;
 
-/**
- * Useful definitions
- */
-#define index(lit) lit + numVars
-#define var(lit)   abs(lit)
-#define max(x, y)  x > y ? x : y   
+                watches[index(-literals[1])].push_back(this);
 
-bool sortLiteralsByOccurrencesDesc(const Variable &a, const Variable &b)
+                return true;
+            }
+        }
+
+        return false;
+    }
+    
+    void calcReason(int lit, vector<int> &reason)
+    {
+        for(int i = (lit == UNDEF ? 0 : 1); i < literals.size(); ++i)
+            reason.push_back(-literals[i]);
+    }
+    
+    void remove()
+    {
+        watches[index(-literals[0])].remove(this);
+        watches[index(-literals[1])].remove(this);
+        
+        delete this;
+    }
+    
+    static bool sortByActivityDesc(const Clause* a, const Clause* b)
+    {
+        bool lock_a = a->locked();
+        bool lock_b = b->locked();
+        
+        if(lock_a && not lock_b)
+            return true;
+        
+        if(lock_b && not lock_a)
+            return false;
+        
+        return a->activity > b->activity;
+    }
+};  
+
+bool sortLiteralsByOccurrencesDesc(const int &a, const int &b)
 {
-    return a.occurrences > b.occurrences;
+    return variables[a].occurrences > variables[b].occurrences;
 }
 
 template<class T> void print(vector<T> &v)
@@ -92,33 +152,35 @@ void readClauses()
     cin >> aux >> numVars >> numClauses;
     
     // Init data structures
-    clauses.resize(numClauses);
     variables.resize(numVars + 1);
+    variableOrder.resize(numVars + 1);
     watches.resize(numVars*2 + 1);
     
     for(int i = 1; i <= numVars; ++i)
-        variables[i].id = i;
+        variableOrder[i] = i;
     
     // Read clauses
     for(uint i = 0; i < numClauses; ++i)
     {
-        clauses[i].id = i;
+        Clause* clause = new Clause();
         
         int lit;
         
         while(cin >> lit and lit != 0)
         {
-            clauses[i].literals.push_back(lit);
+            clause->literals.push_back(lit);
             
-            if(clauses[i].literals.size() <= 2)
-                watches[index(-lit)].push_back(i);
+            if(clause->literals.size() <= 2)
+                watches[index(-lit)].push_back(clause);
             
             variables[var(lit)].occurrences++;
         }
+        
+        clauses.push_back(clause);
     }
     
     // Sort literals by number of occurrences
-    sort(variables.begin(), variables.end(), sortLiteralsByOccurrencesDesc);
+    sort(variableOrder.begin(), variableOrder.end(), sortLiteralsByOccurrencesDesc);
 }
 
 int currentValueInModel(int lit)
@@ -146,31 +208,13 @@ void setLiteralToTrue(int lit)
     variables[var(lit)].level = decisionLevel;
 }
 
-bool findNewWatcher(int literal, Clause &clause)
+bool propagateGivesConflict(int literal, list<Clause*> &watchClauses, Clause* &conflictClause)
 {
-    for(int i = 2; i < clause.literals.size(); ++i)
-    {
-        if(currentValueInModel(clause.literals[i]) != FALSE)
-        {
-            clause.literals[1] = clause.literals[i];
-            clause.literals[i] = literal;
-            
-            watches[index(-clause.literals[1])].push_back(clause.id);
-
-            return true;
-        }
-    }
-
-    return false;
-}
-
-bool propagateGivesConflict(int literal, list<uint> &watchClauses, int &conflictClause)
-{
-    list<uint>::iterator it = watchClauses.begin();
+    list<Clause*>::iterator it = watchClauses.begin();
     
     while(it != watchClauses.end())
     {
-        Clause &clause = clauses[*it];
+        Clause &clause = *(*it); // it -> Clause pointer -> Clause
         
         // Make sure false literal is at second position
         if(clause.literals[0] == literal)
@@ -188,7 +232,7 @@ bool propagateGivesConflict(int literal, list<uint> &watchClauses, int &conflict
             continue;
         }
         
-        if(findNewWatcher(literal, clause))
+        if(clause.findNewWatcher(literal))
         {
             it = watchClauses.erase(it);
             continue;
@@ -208,7 +252,7 @@ bool propagateGivesConflict(int literal, list<uint> &watchClauses, int &conflict
     return false;
 }
 
-bool propagateGivesConflict(int &conflictClause)
+bool propagateGivesConflict(Clause* &conflictClause)
 {
     while(indexOfNextLitToPropagate < modelStack.size())
     {
@@ -230,33 +274,24 @@ void undoOne()
     modelStack.pop_back();
     
     variables[x].level = -1;
-    variables[x].reasonClause = -1;
+    variables[x].reasonClause = NULL;
     model[x] = UNDEF;
-    
-    if(modelStack.back() == 0)
-    {
-        modelStack.pop_back(); // remove the DL mark
-        --decisionLevel;
-    }
-    
-    indexOfNextLitToPropagate = modelStack.size();
 }
 
 void backtrack(int level)
 {
     while(decisionLevel > level)
-        undoOne();
+    {
+        while(modelStack.back() != 0)
+            undoOne();
+        
+        modelStack.pop_back(); // remove the DL mark
+        indexOfNextLitToPropagate = modelStack.size();
+        --decisionLevel;
+    }
 }
 
-void calcReason(int conflict, int lit, vector<int> &reason)
-{
-    Clause &c = clauses[conflict];
-    
-    for(int i = (lit == UNDEF ? 0 : 1); i < c.literals.size(); ++i)
-        reason.push_back(-c.literals[i]);
-}
-
-void analyze(int conflict, Clause &learnt, int &btLevel)
+Clause* analyze(Clause* conflict, int &btLevel)
 {
     vector<bool> seen(numVars + 1, false);
     int counter = 0;
@@ -264,12 +299,14 @@ void analyze(int conflict, Clause &learnt, int &btLevel)
     vector<int> lit_reason;
     
     btLevel = 0;
-    learnt.literals.push_back(0);
+    
+    Clause* learnt = new Clause();
+    learnt->literals.push_back(0);
     
     do
     {
         lit_reason.clear();
-        calcReason(conflict, lit, lit_reason);
+        conflict->calcReason(lit, lit_reason);
         
         for(int i = 0; i < lit_reason.size(); ++i)
         {
@@ -284,7 +321,7 @@ void analyze(int conflict, Clause &learnt, int &btLevel)
                     counter++;
                 else if(vq.level > 0)
                 {
-                    learnt.literals.push_back(-q);
+                    learnt->literals.push_back(-q);
                     btLevel = max(btLevel, vq.level);
                 }
             }
@@ -302,27 +339,32 @@ void analyze(int conflict, Clause &learnt, int &btLevel)
     }
     while(counter > 0);
     
-    learnt.literals[0] = -lit;
+    learnt->literals[0] = -lit;
+    
+    return learnt;
 }
     
-void learn(Clause &clause)
-{
-    clause.id = clauses.size();
-    clauses.push_back(clause);
-    watches[index(-clause.literals[0])].push_back(clause.id);
+void learn(Clause* clause)
+{   
+    if(clause->literals.size() > 1)
+    {
+        clause->activity++;
+        
+        watches[index(-clause->literals[0])].push_back(clause);
+        watches[index(-clause->literals[1])].push_back(clause);
+        variables[var(clause->literals[0])].reasonClause = clause;
+        
+        clauses.push_back(clause);
+    }
     
-    if(clause.literals.size() > 1)
-        watches[index(-clause.literals[1])].push_back(clause.id);
-    
-    variables[var(clause.literals[0])].reasonClause = clause.id;
-    setLiteralToTrue(clause.literals[0]);
+    setLiteralToTrue(clause->literals[0]);
 }
 
 int getNextDecisionLiteral()
 {
     for(uint i = 1; i <= numVars; ++i)
-        if(model[variables[i].id] == UNDEF)
-            return variables[i].id;
+        if(model[variableOrder[i]] == UNDEF)
+            return variableOrder[i];
     
     return 0; // returns 0 when all literals are defined
 }
@@ -333,19 +375,38 @@ void checkmodel()
     {
         bool someTrue = false;
         
-        for(int j = 0; not someTrue and j < clauses[i].literals.size(); ++j)
-            someTrue = (currentValueInModel(clauses[i].literals[j]) == TRUE);
+        for(int j = 0; not someTrue and j < clauses[i]->literals.size(); ++j)
+            someTrue = (currentValueInModel(clauses[i]->literals[j]) == TRUE);
         
         if(not someTrue)
         {
             cout << "Error in model, clause is not satisfied:";
             
-            for(int j = 0; j < clauses[i].literals.size(); ++j)
-                cout << clauses[i].literals[j] << " ";
+            for(int j = 0; j < clauses[i]->literals.size(); ++j)
+                cout << clauses[i]->literals[j] << " ";
             
             cout << endl;
             exit(1);
         }
+    }
+}
+
+void reduceLearntClauses()
+{
+    // Reorder clauses
+    sort(clauses.begin() + numClauses, clauses.end(), Clause::sortByActivityDesc);
+    
+    int remove = MAX_LEARNT_CLAUSES / 2; // Remove the half part
+    int i = 0;
+    
+    Clause* clause = clauses.back();
+    while(i < remove and not clause->locked())
+    {
+        clauses.pop_back();
+        clause->remove();
+        
+        clause = clauses.back();
+        i++;
     }
 }
 
@@ -359,9 +420,9 @@ int main()
     // Take care of initial unit clauses, if any
     for(uint i = 0; i < numClauses; ++i)
     {
-        if(clauses[i].literals.size() == 1)
+        if(clauses[i]->literals.size() == 1)
         {
-            int lit = clauses[i].literals[0];
+            int lit = clauses[i]->literals[0];
             int val = currentValueInModel(lit);
             
             if(val == FALSE)
@@ -374,7 +435,7 @@ int main()
         }
     }
     
-    int conflictClause;
+    Clause* conflictClause;
     int backtrackLevel;
     
     // DPLL algorithm
@@ -388,12 +449,14 @@ int main()
                 return 10;
             }
             
-            Clause learntClause;
-            analyze(conflictClause, learntClause, backtrackLevel);
+            Clause* learntClause = analyze(conflictClause, backtrackLevel);
             backtrack(backtrackLevel);
             learn(learntClause);
         }
         
+        if(learntClauses > MAX_LEARNT_CLAUSES)
+            reduceLearntClauses();
+            
         int decisionLit = getNextDecisionLiteral();
         
         if(decisionLit == 0)
