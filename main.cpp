@@ -4,6 +4,7 @@
 #include <vector>
 #include <list>
 #include <limits>
+#include <set>
 
 using namespace std;
 
@@ -45,12 +46,13 @@ vector<Clause*> clauses;
 vector<Clause*> learntClauses;
 
 vector< list<Clause*> > watches;
-vector<int> variableOrder;
 vector<int> model;
 vector<int> modelStack;
 
 float clauseBump = INIT_CLAUSE_BUMP;
 float clauseInc  = 1.1;
+long long unsigned int variableBump = 1;
+
 static float maxActivity = numeric_limits<float>::max();
 static float rescaleActivity = numeric_limits<float>::min();
 
@@ -63,18 +65,29 @@ void bumpClauseActivity(Clause* clause);
 struct Variable
 {
     uint id;
-    uint occurrences;
+    long long unsigned int activity;
     uint level;
     Clause* reasonClause;
     
-    Variable() : occurrences(0), level(-1), reasonClause(NULL)
+    Variable() : activity(0), level(-1), reasonClause(NULL)
     { }
-    
-    static bool sortByOccurrencesAsc(const int &a, const int &b)
+};
+
+struct VariableCompare
+{
+    bool operator()(const int &a, const int &b) const
     {
-        return variables[a].occurrences > variables[b].occurrences;
+        if(variables[a].activity > variables[b].activity)
+            return true;
+        
+        if(variables[b].activity > variables[a].activity)
+            return false;
+        
+        return a < b;
     }
 };
+
+set<int, VariableCompare> variableOrder;
 
 struct Clause
 {
@@ -145,14 +158,6 @@ struct Clause
     }
 };
 
-template<class T> void print(vector<T> &v)
-{
-    for(int i = 0; i < v.size(); ++i)
-        cout << v[i] << ' ';
-    
-    cout << endl;
-}
-
 void readClauses()
 {
     // Skip comments
@@ -169,11 +174,7 @@ void readClauses()
     
     // Init data structures
     variables.resize(numVars + 1);
-    variableOrder.resize(numVars + 1);
     watches.resize(numVars*2 + 1);
-    
-    for(int i = 1; i <= numVars; ++i)
-        variableOrder[i] = i;
     
     // Read clauses
     for(uint i = 0; i < numClauses; ++i)
@@ -190,14 +191,14 @@ void readClauses()
             if(clause->literals.size() <= 2)
                 watches[index(-lit)].push_back(clause);
             
-            variables[var(lit)].occurrences++;
+            variables[var(lit)].activity++;
         }
         
         clauses.push_back(clause);
     }
-    
-    // Sort literals by number of occurrences
-    sort(variableOrder.begin(), variableOrder.end(), Variable::sortByOccurrencesAsc);
+        
+    for(int i = 1; i <= numVars; ++i)
+        variableOrder.insert(i);
 }
 
 int currentValueInModel(int lit)
@@ -397,6 +398,15 @@ void bumpClauseActivity(Clause* clause)
         clause->activity = activity;
 }
 
+void bumpVariableActivity(int variable)
+{
+    set<int>::const_iterator it = variableOrder.find(variable);
+    variableOrder.erase(it);
+    
+    variables[variable].activity += clauseBump;
+    variableOrder.insert(variable);
+}
+
 void learn(Clause* clause)
 {   
     if(clause->literals.size() > 1)
@@ -412,14 +422,23 @@ void learn(Clause* clause)
         learntClauses.push_back(clause);
     }
     
+    for(int i = 0; i < clause->literals.size(); ++i)
+        bumpVariableActivity(var(clause->literals[i]));
+    
     setLiteralToTrue(clause->literals[0]);
 }
 
 int getNextDecisionLiteral()
 {
-    for(uint i = 1; i <= numVars; ++i)
-        if(model[variableOrder[i]] == UNDEF)
-            return variableOrder[i];
+    set<int>::const_iterator it = variableOrder.begin();
+    
+    while(it != variableOrder.end())
+    {
+        if(model[*it] == UNDEF)
+            return *it;
+        
+        ++it;
+    }
     
     return 0; // returns 0 when all literals are defined
 }
@@ -448,9 +467,9 @@ void checkmodel()
 
 void reduceLearntClauses()
 {
-    // Reorder clauses
+    // Sort clauses
     sort(learntClauses.begin(), learntClauses.end(), Clause::sortByActivityDesc);
-    
+
     int remove = MAX_LEARNT_CLAUSES / 2; // Remove the half part
     int i = 0;
     
@@ -508,6 +527,7 @@ int main()
             backtrack(backtrackLevel);
             learn(learntClause);
             clauseBump *= clauseInc;
+            variableBump++;
         }
         
         if(numLearntClauses() > MAX_LEARNT_CLAUSES)
