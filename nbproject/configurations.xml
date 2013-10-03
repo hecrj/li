@@ -35,7 +35,7 @@
       </toolsSet>
       <compileType>
         <ccTool>
-          <commandLine>-O2</commandLine>
+          <commandLine>-O3</commandLine>
         </ccTool>
       </compileType>
     </conf>

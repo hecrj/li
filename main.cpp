@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <vector>
 #include <list>
+#include <limits>
 
 using namespace std;
 
@@ -19,13 +20,14 @@ using namespace std;
  */
 #define index(lit)              lit + numVars
 #define var(lit)                abs(lit)
-#define max(x, y)               x > y ? x : y
+#define maxV(x, y)              x > y ? x : y
 #define numLearntClauses()      (int)(learntClauses.size() - modelStack.size() + decisionLevel)
 
 /**
  * Config definitions
  */
-#define MAX_LEARNT_CLAUSES 300
+#define MAX_LEARNT_CLAUSES      300
+#define INIT_CLAUSE_BUMP        1
     
 /**
  * GLOBAL VARIABLES
@@ -47,7 +49,13 @@ vector<int> variableOrder;
 vector<int> model;
 vector<int> modelStack;
 
+float clauseBump = INIT_CLAUSE_BUMP;
+float clauseInc  = 1.1;
+static float maxActivity = numeric_limits<float>::max();
+static float rescaleActivity = numeric_limits<float>::min();
+
 int currentValueInModel(int lit);
+void bumpClauseActivity(Clause* clause);
 
 /**
  * CLASSES
@@ -72,9 +80,7 @@ struct Clause
 {
     vector<int> literals;
     float activity;
-    
-    Clause() : activity(0)
-    { }
+    bool learnt;
     
     ~Clause() { }
     
@@ -105,6 +111,9 @@ struct Clause
     {
         for(int i = (lit == UNDEF ? 0 : 1); i < literals.size(); ++i)
             reason.push_back(-literals[i]);
+        
+        if(learnt)
+            bumpClauseActivity(this);
     }
     
     void remove()
@@ -126,7 +135,13 @@ struct Clause
         if(lock_b && not lock_a)
             return false;
         
-        return a->activity > b->activity;
+        if(a->activity > b->activity)
+            return true;
+        
+        if(b->activity > a->activity)
+            return false;
+        
+        return false;
     }
 };
 
@@ -164,6 +179,7 @@ void readClauses()
     for(uint i = 0; i < numClauses; ++i)
     {
         Clause* clause = new Clause();
+        clause->learnt = false;
         
         int lit;
         
@@ -323,7 +339,7 @@ Clause* analyze(Clause* conflict, int &btLevel)
                 else if(vq.level > 0)
                 {
                     learnt->literals.push_back(-q);
-                    btLevel = max(btLevel, vq.level);
+                    btLevel = maxV(btLevel, vq.level);
                 }
             }
         }
@@ -344,12 +360,36 @@ Clause* analyze(Clause* conflict, int &btLevel)
     
     return learnt;
 }
+
+void rescaleClauseActivity()
+{
+    for(int i = 0; i < learntClauses.size(); ++i)
+        learntClauses[i]->activity *= rescaleActivity;
     
+    clauseBump = INIT_CLAUSE_BUMP;
+}
+
+void bumpClauseActivity(Clause* clause)
+{
+    float activity = clause->activity + clauseBump;
+    
+    if(activity > maxActivity)
+    {
+        rescaleClauseActivity();
+        
+        clause->activity += clauseBump;
+    }
+    else
+        clause->activity = activity;
+}
+
 void learn(Clause* clause)
 {   
     if(clause->literals.size() > 1)
     {
-        clause->activity++;
+        clause->learnt = true;
+        clause->activity = 0;
+        bumpClauseActivity(clause);
         
         watches[index(-clause->literals[0])].push_back(clause);
         watches[index(-clause->literals[1])].push_back(clause);
@@ -453,6 +493,7 @@ int main()
             Clause* learntClause = analyze(conflictClause, backtrackLevel);
             backtrack(backtrackLevel);
             learn(learntClause);
+            clauseBump *= clauseInc;
         }
         
         if(numLearntClauses() > MAX_LEARNT_CLAUSES)
