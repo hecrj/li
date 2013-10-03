@@ -320,6 +320,8 @@ Clause* analyze(Clause* conflict, int &btLevel)
     Clause* learnt = new Clause();
     learnt->literals.push_back(0);
     
+    int max_i = 1;
+    
     do
     {
         lit_reason.clear();
@@ -339,7 +341,12 @@ Clause* analyze(Clause* conflict, int &btLevel)
                 else if(vq.level > 0)
                 {
                     learnt->literals.push_back(-q);
-                    btLevel = maxV(btLevel, vq.level);
+                    
+                    if(btLevel < vq.level)
+                    {
+                        btLevel = vq.level;
+                        max_i = learnt->literals.size();
+                    }
                 }
             }
         }
@@ -357,6 +364,13 @@ Clause* analyze(Clause* conflict, int &btLevel)
     while(counter > 0);
     
     learnt->literals[0] = -lit;
+    
+    if(max_i > 1)
+    {
+        int aux = learnt->literals[1];
+        learnt->literals[1] = learnt->literals[max_i-1];
+        learnt->literals[max_i-1] = aux;
+    }
     
     return learnt;
 }
