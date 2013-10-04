@@ -28,9 +28,9 @@ using namespace std;
 /**
  * Config definitions
  */
-#define INIT_CLAUSE_BUMP        1
+#define INIT_CLAUSE_BUMP        10
 #define INIT_VARIABLE_BUMP      10
-#define LEARNING                TRUE
+    
 /**
  * GLOBAL VARIABLES
  */
@@ -41,6 +41,7 @@ uint decisionLevel;
 
 struct Variable;
 struct Clause;
+typedef long long unsigned int heuristic;
 
 vector<Variable> variables;
 vector<Clause*> clauses;
@@ -52,16 +53,15 @@ vector<int> model;
 vector<int> modelStack;
 
 int maxLearntClauses = 10;
-int maxLearntClausesLimit = 350;
+int maxLearntClausesLimit = 300;
+int reduceCounter = 0;
+int maxReduceCounter = 5;
 
-float clauseBump = INIT_CLAUSE_BUMP;
-float clauseInc  = 1.1;
+heuristic variableBump = INIT_VARIABLE_BUMP;
+heuristic clauseBump   = INIT_CLAUSE_BUMP;
 
-long long unsigned int variableBump = INIT_VARIABLE_BUMP;
-long long unsigned int variableInc = 1;
-
-static float maxActivity = numeric_limits<float>::max();
-static float rescaleActivity = numeric_limits<float>::min();
+static heuristic maxActivity = numeric_limits<heuristic>::max();
+static heuristic activityInc = 1;
 
 int currentValueInModel(int lit);
 void bumpClauseActivity(Clause* clause);
@@ -97,7 +97,7 @@ struct VariableCompare
 struct Clause
 {
     vector<int> literals;
-    float activity;
+    long long unsigned int activity;
     bool learnt;
     
     ~Clause() { }
@@ -269,7 +269,8 @@ bool propagateGivesConflict(int literal, list<Clause*> &watchClauses, Clause* &c
             for(int i = 0; i < clause.literals.size(); ++i)
                 variables[var(clause.literals[i])].activity += variableBump;
             
-            variableBump += variableInc; // Increment variable bump
+            variableBump += activityInc; // Increment variable bump
+            clauseBump   += activityInc;
             return true;
         }
         
@@ -318,29 +319,6 @@ inline void backtrack(int level)
         indexOfNextLitToPropagate = modelStack.size();
         --decisionLevel;
     }
-}
-
-inline void backtrack()
-{
-    uint i = modelStack.size() - 1;
-    int lit = 0;
-    int id;
-    
-    while(modelStack[i] != 0) // 0 is the DL mark
-    {
-        lit = modelStack[i];
-        id = abs(lit);
-        
-        model[id] = UNDEF;
-        modelStack.pop_back();
-        --i;
-    }
-    
-    // at this point, lit is the last decision
-    modelStack.pop_back(); // remove the DL mark
-    --decisionLevel;
-    indexOfNextLitToPropagate = modelStack.size();
-    setLiteralToTrue(-lit); // reverse last decision
 }
 
 Clause* analyze(Clause* conflict, int &btLevel)
@@ -412,24 +390,12 @@ Clause* analyze(Clause* conflict, int &btLevel)
 
 void rescaleClauseActivity()
 {
-    for(int i = 0; i < learntClauses.size(); ++i)
-        learntClauses[i]->activity *= rescaleActivity;
-    
-    clauseBump = INIT_CLAUSE_BUMP;
+    // TODO!
 }
 
 void bumpClauseActivity(Clause* clause)
 {
-    float activity = clause->activity + clauseBump;
-    
-    if(activity > maxActivity)
-    {
-        rescaleClauseActivity();
-        
-        clause->activity += clauseBump;
-    }
-    else
-        clause->activity = activity;
+    clause->activity += clauseBump;
 }
 
 void learn(Clause* clause)
@@ -556,26 +522,27 @@ int main()
                 return 10;
             }
             
-#if LEARNING
             Clause* learntClause = analyze(conflictClause, backtrackLevel);
             backtrack(backtrackLevel);
             learn(learntClause);
-            clauseBump *= clauseInc;
-#else
-            backtrack();
-#endif
         }
 
-#if LEARNING
         if(numLearntClauses() > maxLearntClauses)
         {
             reduceLearntClauses();
             
             if(maxLearntClauses <= maxLearntClausesLimit)
-                maxLearntClauses ++;
+            {
+                if(reduceCounter >= maxReduceCounter)
+                {
+                    maxLearntClauses ++;
+                    reduceCounter = 0;
+                }
+                
+                reduceCounter++;
+            }
         }
-#endif
-            
+        
         int decisionLit = getNextDecisionLiteral();
         
         if(decisionLit == 0)
