@@ -204,7 +204,9 @@ void readClauses()
     }
         
     for(int i = 1; i <= numVars; ++i)
-        variables[i].activity = (occurrences[index(i)] + occurrences[index(-i)]) / (numVars / 30);
+        variables[i].activity = (occurrences[index(i)] + occurrences[index(-i)]) / (numVars / 60);
+    
+    variableBump = numClauses / 2;
 }
 
 inline int currentValueInModel(int lit)
