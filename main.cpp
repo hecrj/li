@@ -234,6 +234,42 @@ inline void setLiteralToTrue(int lit)
     variables[var(lit)].level = decisionLevel;
 }
 
+void rescaleVariableActivity()
+{
+    heuristic scaleFactor = maxActivity / (numVars * 15);
+    
+    for(int i = 1; i <= numVars; ++i)
+        variables[i].activity /= scaleFactor;
+    
+    variableBump = INIT_VARIABLE_BUMP * 15;
+}
+
+void bumpVariableActivity(int variable)
+{
+    if(variables[variable].activity > (maxActivity - variableBump))
+        rescaleVariableActivity();
+    
+    variables[variable].activity += variableBump;
+}
+
+void rescaleClauseActivity()
+{
+    heuristic scaleFactor = maxActivity / (learntClauses.size() * 15);
+    
+    for(int i = 0; i < learntClauses.size(); ++i)
+        learntClauses[i]->activity /= scaleFactor;
+    
+    clauseBump = INIT_CLAUSE_BUMP * 15;
+}
+
+void bumpClauseActivity(Clause* clause)
+{
+    if(clause->activity > (maxActivity - clauseBump))
+        rescaleClauseActivity();
+    
+    clause->activity += clauseBump;
+}
+
 bool propagateGivesConflict(int literal, list<Clause*> &watchClauses, Clause* &conflictClause)
 {
     list<Clause*>::iterator it = watchClauses.begin();
@@ -269,7 +305,7 @@ bool propagateGivesConflict(int literal, list<Clause*> &watchClauses, Clause* &c
             conflictClause = *it;
             
             for(int i = 0; i < clause.literals.size(); ++i)
-                variables[var(clause.literals[i])].activity += variableBump;
+                bumpVariableActivity(var(clause.literals[i]));
             
             variableBump += activityInc; // Increment variable bump
             clauseBump   += activityInc;
@@ -388,16 +424,6 @@ Clause* analyze(Clause* conflict, int &btLevel)
     }
     
     return learnt;
-}
-
-void rescaleClauseActivity()
-{
-    // TODO!
-}
-
-void bumpClauseActivity(Clause* clause)
-{
-    clause->activity += clauseBump;
 }
 
 void learn(Clause* clause)
