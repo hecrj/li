@@ -41,11 +41,12 @@ uint decisionLevel;
 
 struct Variable;
 struct Clause;
+struct LearntClause;
 typedef long long unsigned int heuristic;
 
 vector<Variable> variables;
 vector<Clause*> clauses;
-vector<Clause*> learntClauses;
+vector<LearntClause*> learntClauses;
 
 vector< list<Clause*> > watches;
 vector<long long unsigned int> occurrences;
@@ -64,7 +65,7 @@ static heuristic maxActivity = numeric_limits<heuristic>::max();
 static heuristic activityInc = 1;
 
 int currentValueInModel(int lit);
-void bumpClauseActivity(Clause* clause);
+void bumpClauseActivity(LearntClause* clause);
 
 /**
  * CLASSES
@@ -97,8 +98,6 @@ struct VariableCompare
 struct Clause
 {
     vector<int> literals;
-    long long unsigned int activity;
-    bool learnt;
     
     ~Clause() { }
     
@@ -125,13 +124,10 @@ struct Clause
         return false;
     }
     
-    inline void calcReason(int lit, vector<int> &reason)
+    virtual inline void calcReason(int lit, vector<int> &reason)
     {
         for(int i = (lit == UNDEF ? 0 : 1); i < literals.size(); ++i)
             reason.push_back(-literals[i]);
-        
-        if(learnt)
-            bumpClauseActivity(this);
     }
     
     inline void remove()
@@ -142,7 +138,20 @@ struct Clause
         delete this;
     }
     
-    static bool sortByActivityDesc(const Clause* a, const Clause* b)
+};
+
+struct LearntClause : Clause
+{
+    heuristic activity;
+    
+    virtual inline void calcReason(int lit, vector<int>& reason)
+    {
+        Clause::calcReason(lit, reason);
+        
+        bumpClauseActivity(this);
+    }
+    
+    static bool sortByActivityDesc(const LearntClause* a, const LearntClause* b)
     {
         bool lock_a = a->locked();
         bool lock_b = b->locked();
@@ -186,7 +195,6 @@ void readClauses()
     for(uint i = 0; i < numClauses; ++i)
     {
         Clause* clause = new Clause();
-        clause->learnt = false;
         
         int lit;
         
@@ -262,7 +270,7 @@ void rescaleClauseActivity()
     clauseBump = INIT_CLAUSE_BUMP * 15;
 }
 
-void bumpClauseActivity(Clause* clause)
+void bumpClauseActivity(LearntClause* clause)
 {
     if(clause->activity > (maxActivity - clauseBump))
         rescaleClauseActivity();
@@ -359,7 +367,7 @@ inline void backtrack(int level)
     }
 }
 
-Clause* analyze(Clause* conflict, int &btLevel)
+LearntClause* analyze(Clause* conflict, int &btLevel)
 {
     vector<bool> seen(numVars + 1, false);
     int counter = 0;
@@ -368,7 +376,7 @@ Clause* analyze(Clause* conflict, int &btLevel)
     
     btLevel = 0;
     
-    Clause* learnt = new Clause();
+    LearntClause* learnt = new LearntClause();
     learnt->literals.push_back(0);
     
     int max_i = 1;
@@ -426,11 +434,10 @@ Clause* analyze(Clause* conflict, int &btLevel)
     return learnt;
 }
 
-void learn(Clause* clause)
+void learn(LearntClause* clause)
 {
     if(clause->literals.size() > 1)
     {
-        clause->learnt = true;
         clause->activity = 0;
         bumpClauseActivity(clause);
         
@@ -495,7 +502,7 @@ void checkmodel()
 void reduceLearntClauses()
 {
     // Sort clauses
-    sort(learntClauses.begin(), learntClauses.end(), Clause::sortByActivityDesc);
+    sort(learntClauses.begin(), learntClauses.end(), LearntClause::sortByActivityDesc);
 
     int remove = maxLearntClauses / 2; // Remove the half part
     int i = 0;
@@ -550,7 +557,7 @@ int main()
                 return 10;
             }
             
-            Clause* learntClause = analyze(conflictClause, backtrackLevel);
+            LearntClause* learntClause = analyze(conflictClause, backtrackLevel);
             backtrack(backtrackLevel);
             learn(learntClause);
         }
