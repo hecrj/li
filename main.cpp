@@ -5,78 +5,125 @@
 #include <list>
 #include <limits>
 #include <set>
-#include <cassert>
 
 using namespace std;
-
-#define UNDEF -1
-#define TRUE   1
-#define FALSE  0
 
 #ifdef __APPLE__
     typedef unsigned int uint;
 #endif
    
 /**
- * Useful definitions
+ * USEFUL DEFINITIONS
  */
+#define UNDEF                   -1
+#define TRUE                    1
+#define FALSE                   0
 #define index(lit)              lit + numVars
 #define var(lit)                abs(lit)
 #define maxV(x, y)              x > y ? x : y
 #define numLearntClauses()      (int)(learntClauses.size() - modelStack.size() + decisionLevel)
 
 /**
- * Config definitions
+ * CONFIG DEFINITIONS
  */
-#define INIT_CLAUSE_BUMP        10
 #define INIT_VARIABLE_BUMP      10
-    
-/**
- * GLOBAL VARIABLES
- */
-uint numVars;
-uint numClauses;
-uint indexOfNextLitToPropagate;
-uint decisionLevel;
+#define INIT_CLAUSE_BUMP        10
 
+/**
+ * TYPE DEFINITIONS
+ */
 struct Variable;
 struct Clause;
 struct LearntClause;
 typedef long long unsigned int heuristic;
 
-vector<Variable> variables;
-vector<Clause*> clauses;
-vector<LearntClause*> learntClauses;
+/**
+ * GLOBAL VARIABLES
+ */
+uint numVars;                           // Number of variables
+uint numClauses;                        // Number of clauses
+uint indexOfNextLitToPropagate;         // Index of the next literal to propagate in model
+uint decisionLevel;                     // Number of decisions made
 
+vector<Variable> variables;             // Problem variables
+vector<Clause*> clauses;                // Problem clauses
+vector<LearntClause*> learntClauses;    // Clauses learnt from conflicts
+vector<int> model;                      // Model that represents the solution to the problem
+vector<int> modelStack;                 // Chronological trail of the literals set to true
+
+/**
+ * For every literal lit, it contains the clauses where -lit is a watched literal.
+ * Every clause has two watched literals (the ones placed in the first and second positions).
+ * If one watched literal is set to false, then we need to find a new literal in the clause
+ * that is not false and update its position in the clause.
+ */
 vector< list<Clause*> > watches;
-vector<long long unsigned int> occurrences;
-vector<int> model;
-vector<int> modelStack;
 
-int maxLearntClauses = 10;
-int maxLearntClausesLimit = 300;
+/**
+ * For every literal lit: occurrences[index(lit)] contains the number of appearances of lit
+ * in the problem clauses.
+ */
+vector<uint> occurrences;
+
+/**
+ * Heuristic configuration
+ */
+int maxLearntClauses = 10;              // Initial max number of clauses that can be learned
+const int maxLearntClausesLimit = 300;  // Limits the maxLearntClauses number
+
+/**
+ * reduceCounter counts the times that the learnt clauses have been reduced before
+ * incrementing the number of maxLearntClauses (triggered by reduceCounterLimit).
+ */
 int reduceCounter = 0;
-int maxReduceCounter = 5;
+const int reduceCounterLimit = 5;
 
-heuristic variableBump = INIT_VARIABLE_BUMP;
-heuristic clauseBump   = INIT_CLAUSE_BUMP;
+heuristic variableBump = INIT_VARIABLE_BUMP;    // Initial variable bump
+heuristic clauseBump   = INIT_CLAUSE_BUMP;      // Initial clause bump
 
-static heuristic maxActivity = numeric_limits<heuristic>::max();
-static heuristic activityInc = 1;
+/**
+ * Maximum activity that any variable or clause can have.
+ */
+const heuristic maxActivity = numeric_limits<heuristic>::max();
 
+/**
+ * Represents the increment that should be performed to the variable/clause bumps.
+ */
+const heuristic activityInc = 1;
+
+/**
+ * HEADER DEFINITONS (needed in some classes)
+ */
 int currentValueInModel(int lit);
 void bumpClauseActivity(LearntClause* clause);
 
 /**
- * CLASSES
+ * CLASS DEFINITIONS
+ */
+
+/**
+ * Represents a problem variable.
  */
 struct Variable
 {
-    uint id;
-    long long unsigned int activity;
+    /**
+     * Activity heuristic of the variable
+     */
+    heuristic activity;
+    
+    /**
+     * Decision level where variable was set
+     */
     uint level;
+    
+    /**
+     * Reason to set the variable
+     */
     Clause* reasonClause;
     
+    /**
+     * Default constructor
+     */
     Variable() : activity(0), level(-1), reasonClause(NULL)
     { }
 };
@@ -95,23 +142,27 @@ struct VariableCompare
     }
 };
 
+/**
+ * Represents a problem clause.
+ */
 struct Clause
 {
+    /**
+     * Literals of the clause
+     */
     vector<int> literals;
     
-    ~Clause() { }
-    
-    bool locked() const
-    {
-        return variables[var(literals[0])].reasonClause == this;
-    }
-    
-    inline bool findNewWatcher(int literal)
+    /**
+     * Tries to find a new second watched literal.
+     * @return True if found, false otherwise
+     */
+    inline bool findNewWatcher()
     {
         for(int i = 2; i < literals.size(); ++i)
         {
             if(currentValueInModel(literals[i]) != FALSE)
             {
+                int literal = literals[1];
                 literals[1] = literals[i];
                 literals[i] = literal;
 
@@ -124,12 +175,20 @@ struct Clause
         return false;
     }
     
+    /**
+     * Pushes in reason the literals of the clause negated.
+     * @param lit If defined, first literal of the clause is skipped
+     * @param reason Where to push the literals
+     */
     virtual inline void calcReason(int lit, vector<int> &reason)
     {
         for(int i = (lit == UNDEF ? 0 : 1); i < literals.size(); ++i)
             reason.push_back(-literals[i]);
     }
     
+    /**
+     * Removes the clause, updating the watched literals structure accordingly.
+     */
     inline void remove()
     {
         watches[index(-literals[0])].remove(this);
@@ -140,10 +199,22 @@ struct Clause
     
 };
 
+/**
+ * A LearntClause is a Clause created by analysis of a conflict.
+ */
 struct LearntClause : Clause
 {
+    /**
+     * Activity heuristic of the learnt clause.
+     */
     heuristic activity;
     
+    /**
+     * Pushes in reason the literals of the clause negated.
+     * Bumps the clause activity.
+     * @param lit If defined, first literal of the clause is skipped
+     * @param reason Where to push the literals
+     */
     virtual inline void calcReason(int lit, vector<int>& reason)
     {
         Clause::calcReason(lit, reason);
@@ -151,6 +222,23 @@ struct LearntClause : Clause
         bumpClauseActivity(this);
     }
     
+    /**
+     * Tells whether or not the learnt clause is locked.
+     * A learnt clause is locked if is the current reason for some variable.
+     * A locked clause can not be removed when reducing.
+     */
+    bool locked() const
+    {
+        return variables[var(literals[0])].reasonClause == this;
+    }
+    
+    /**
+     * Sort function used to sort the learnt clauses by activity in a strict weak ordering
+     * relation.
+     * @param a First clause to compare
+     * @param b Second clause to compare
+     * @return True if a must be placed before b, false otherwise
+     */
     static bool sortByActivityDesc(const LearntClause* a, const LearntClause* b)
     {
         bool lock_a = a->locked();
@@ -302,7 +390,7 @@ bool propagateGivesConflict(int literal, list<Clause*> &watchClauses, Clause* &c
             continue;
         }
         
-        if(clause.findNewWatcher(literal))
+        if(clause.findNewWatcher())
         {
             it = watchClauses.erase(it);
             continue;
@@ -507,7 +595,7 @@ void reduceLearntClauses()
     int remove = maxLearntClauses / 2; // Remove the half part
     int i = 0;
     
-    Clause* clause = learntClauses.back();
+    LearntClause* clause = learntClauses.back();
     while(i < remove and not clause->locked())
     {
         learntClauses.pop_back();
@@ -568,7 +656,7 @@ int main()
             
             if(maxLearntClauses <= maxLearntClausesLimit)
             {
-                if(reduceCounter >= maxReduceCounter)
+                if(reduceCounter >= reduceCounterLimit)
                 {
                     maxLearntClauses ++;
                     reduceCounter = 0;
