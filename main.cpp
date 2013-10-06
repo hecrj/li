@@ -322,7 +322,7 @@ void readClauses()
     variableSetEnabled = (numVars >= VARS_TO_ENABLE_SET);
     
     // Initalize heuristics based in literal occurrences and the number of clauses
-    int scaleFactor = (numVars / 60) ? : 2;
+    int scaleFactor = (numVars / 60) ? : 1;
     
     for(int i = 1; i <= numVars; ++i)
     {
