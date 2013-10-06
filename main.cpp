@@ -534,51 +534,70 @@ inline void backjump(int level)
  * @param btLevel Level where to jump
  * @return The generated clause
  */
-LearntClause* analyze(Clause* conflict, int &btLevel)
+LearntClause* analyze(Clause* conflict, int &backjumpLevel)
 {
+    // Keep track of what variables have been seen or not
     vector<bool> seen(numVars + 1, false);
+    
+    // Tells how much we need to keep analyzing
     int counter = 0;
+    
+    // Last literal assignment analyzed
     int lit = UNDEF;
-    vector<int> lit_reason;
     
-    btLevel = 0;
+    // Stores the reason of the last literal
+    vector<int> litReason;
     
+    // Initialize backjump level
+    backjumpLevel = 0;
+    
+    // Create the new clause
     LearntClause* learnt = new LearntClause();
+    
+    // Make some space to the first literal
     learnt->literals.push_back(0);
     
-    int max_i = 1;
+    // Contains the index-1 of the literal with highest decision level
+    int maxIndex = 1;
     
     do
     {
-        lit_reason.clear();
-        conflict->calcReason(lit, lit_reason);
+        litReason.clear();
+        // Calculate litReason from conflict
+        conflict->calcReason(lit, litReason);
         
-        for(int i = 0; i < lit_reason.size(); ++i)
+        for(int i = 0; i < litReason.size(); ++i)
         {
-            int q = lit_reason[i];
+            int q = litReason[i];
             Variable& vq = variables[var(q)];
             
-            if(not seen[var(q)])
+            // If the variable has been seen, skip it
+            if(seen[var(q)])
+                continue;
+            
+            seen[var(q)] = true;
+            
+            if(vq.level == decisionLevel)
+                counter++; // If variable assignment has been in the current decision level,
+                           // we need to analyze further
+            
+            else if(vq.level > 0)
             {
-                seen[var(q)] = true;
+                // Add reason literal to the clause, negated
+                learnt->literals.push_back(-q);
                 
-                if(vq.level == decisionLevel)
-                    counter++;
-                else if(vq.level > 0)
+                // Update backjump level and maxIndex accordingly
+                if(backjumpLevel < vq.level)
                 {
-                    learnt->literals.push_back(-q);
-                    
-                    if(btLevel < vq.level)
-                    {
-                        btLevel = vq.level;
-                        max_i = learnt->literals.size();
-                    }
+                    backjumpLevel = vq.level;
+                    maxIndex = learnt->literals.size();
                 }
             }
         }
         
         do
         {
+            // Find next literal whose variable is already seen to analyze further
             lit = modelStack.back();
             conflict = variables[var(lit)].reasonClause;
             undoOne();
@@ -589,18 +608,27 @@ LearntClause* analyze(Clause* conflict, int &btLevel)
     }
     while(counter > 0);
     
+    // Add last (non-analyzed) literal seen and found in the current decision level
+    // to the first position in the clause (first watched literal)
     learnt->literals[0] = -lit;
     
-    if(max_i > 1)
+    // If learntClause has more than one literal, move the literal with highest decision
+    // level to the second position (second watched literal)
+    // This is useful to improve performance.
+    if(maxIndex > 1)
     {
         int aux = learnt->literals[1];
-        learnt->literals[1] = learnt->literals[max_i-1];
-        learnt->literals[max_i-1] = aux;
+        learnt->literals[1] = learnt->literals[maxIndex-1];
+        learnt->literals[maxIndex-1] = aux;
     }
     
     return learnt;
 }
 
+/**
+ * Learns a clause and sets its first literal to true.
+ * @param clause The clause to learn
+ */
 void learn(LearntClause* clause)
 {
     if(clause->literals.size() > 1)
@@ -618,6 +646,11 @@ void learn(LearntClause* clause)
     setLiteralToTrue(clause->literals[0]);
 }
 
+/**
+ * Selects the most active variable and returns the variable id negated or not depending which
+ * of that two literals has more occurrences.
+ * @return The described literal
+ */
 int getNextDecisionLiteral()
 {
     int var = 0;
@@ -644,6 +677,10 @@ int getNextDecisionLiteral()
         return -var;
 }
 
+/**
+ * Checks that the current model satisfies the clauses.
+ * If some clause is not satisfied, it gets printed and execution terminates.
+ */
 void checkmodel()
 {
     for(int i = 0; i < numClauses; ++i)
@@ -666,15 +703,20 @@ void checkmodel()
     }
 }
 
+/**
+ * Halves the set of learnt clauses, approximately, removing the ones that are less active.
+ */
 void reduceLearntClauses()
 {
-    // Sort clauses
+    // Sort clauses (locked clauses are on top)
     sort(learntClauses.begin(), learntClauses.end(), LearntClause::sortByActivityDesc);
 
     int remove = maxLearntClauses / 2; // Remove the half part
     int i = 0;
     
     LearntClause* clause = learntClauses.back();
+    
+    // Remove the clauses, if current clause is locked => all the rest are locked
     while(i < remove and not clause->locked())
     {
         learntClauses.pop_back();
@@ -685,6 +727,10 @@ void reduceLearntClauses()
     }
 }
 
+/**
+ * Reads a SAT problem and prints whether is satisfiable or not.
+ * @return 10 if unsatisfiable, 20 otherwise
+ */
 int main()
 {
     readClauses(); // reads numVars, numClauses and clauses
@@ -711,7 +757,7 @@ int main()
     }
     
     Clause* conflictClause;
-    int backtrackLevel;
+    int backjumpLevel;
     
     // DPLL algorithm
     while(true)
@@ -724,24 +770,34 @@ int main()
                 return 10;
             }
             
-            LearntClause* learntClause = analyze(conflictClause, backtrackLevel);
-            backjump(backtrackLevel);
+            // Analyze conflict
+            LearntClause* learntClause = analyze(conflictClause, backjumpLevel);
+            
+            // Backjump
+            backjump(backjumpLevel);
+            
+            // Learn from conflict
             learn(learntClause);
         }
-
+        
         if(numLearntClauses() > maxLearntClauses)
         {
+            // Too much learnt clauses, reducing needed
             reduceLearntClauses();
             
+            // If limit of max learnt clauses still not reached
             if(maxLearntClauses <= maxLearntClausesLimit)
             {
+                // If we reduced an amount of reduceCounterLimit times
                 if(reduceCounter >= reduceCounterLimit)
                 {
+                    // Increment number of max learnt clauses
                     maxLearntClauses ++;
+                    // Reset counter
                     reduceCounter = 0;
                 }
                 
-                reduceCounter++;
+                reduceCounter++; // Increment counter
             }
         }
         
