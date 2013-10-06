@@ -45,9 +45,12 @@ uint numVars;                           // Number of variables
 uint numClauses;                        // Number of clauses
 uint indexOfNextLitToPropagate;         // Index of the next literal to propagate in model
 uint decisionLevel;                     // Current decision level
+
+#ifdef VERBOSE
 uint decisionCount;                     // Total number of decisions made
 uint conflictCount;                     // Total number of conflicts detected
 uint propagationCount;                  // Total number of propagations performed
+#endif
 
 vector<Variable> variables;             // Problem variables
 vector<Clause*> clauses;                // Problem clauses
@@ -341,7 +344,9 @@ void readClauses()
     variableBump = INIT_VARIABLE_BUMP;
     clauseBump = INIT_CLAUSE_BUMP;
     
+#ifdef VERBOSE
     decisionCount = propagationCount = conflictCount = 0;
+#endif
 }
 
 /**
@@ -495,7 +500,9 @@ bool propagateGivesConflict(int literal, list<Clause*> &watchClauses, Clause* &c
             variableBump += activityInc;
             clauseBump   += activityInc;
             
+#ifdef VERBOSE
             conflictCount++;
+#endif
             return true;
         }
         
@@ -505,7 +512,9 @@ bool propagateGivesConflict(int literal, list<Clause*> &watchClauses, Clause* &c
         // Update reason clause of the variable set
         variables[var(clause.literals[0])].reasonClause = *it;
         
+#ifdef VERBOSE
         propagationCount++;
+#endif
         ++it;
     }
     
@@ -779,6 +788,7 @@ void reduceLearntClauses()
     }
 }
 
+#ifdef VERBOSE
 /**
  * Prints the total number of decisions, conflicts and propagations occurred while
  * solving the problem.
@@ -789,6 +799,7 @@ void printSummary()
     cout << conflictCount << " conflicts" << endl;
     cout << propagationCount << " propagations" << endl;
 }
+#endif
 
 /**
  * Reads a SAT problem and prints whether is satisfiable or not.
@@ -830,7 +841,10 @@ int main()
             if(decisionLevel == 0)
             {
                 cout << "UNSATISFIABLE" << endl;
+                
+#ifdef VERBOSE
                 printSummary();
+#endif
                 
                 return 10;
             }
@@ -872,7 +886,10 @@ int main()
         {
             checkmodel();
             cout << "SATISFIABLE" << endl;
-            printSummary();
+            
+#ifdef VERBOSE
+                printSummary();
+#endif
             
             return 20;
         }
@@ -882,7 +899,9 @@ int main()
         ++indexOfNextLitToPropagate;
         ++decisionLevel;
         
+#ifdef VERBOSE
         decisionCount++;
+#endif
         setLiteralToTrue(decisionLit); // now push decisionLit on top of the mark
     }
 }
