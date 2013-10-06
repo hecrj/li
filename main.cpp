@@ -84,7 +84,7 @@ heuristic clauseBump;                   // Clause heuristic bump
 /**
  * Maximum activity that any variable or clause can have.
  */
-const heuristic maxActivity = numeric_limits<heuristic>::max();
+const heuristic maxActivity = numeric_limits<long long unsigned int>::max();
 
 /**
  * Represents the increment that should be performed to the variable/clause bumps.
