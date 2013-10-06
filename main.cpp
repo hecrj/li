@@ -36,7 +36,7 @@ using namespace std;
 struct Variable;
 struct Clause;
 struct LearntClause;
-typedef long long unsigned int heuristic;
+typedef unsigned int heuristic;
 
 /**
  * GLOBAL VARIABLES
@@ -93,7 +93,7 @@ heuristic clauseBump;                   // Clause heuristic bump
 /**
  * Maximum activity that any variable or clause can have.
  */
-const heuristic maxActivity = numeric_limits<long long unsigned int>::max();
+const heuristic maxActivity = numeric_limits<unsigned int>::max();
 
 /**
  * Represents the increment that should be performed to the variable/clause bumps.
@@ -714,7 +714,7 @@ int getNextDecisionLiteral()
     }
     else
     {
-        long long int max = 0;
+        heuristic max = 0;
 
         for(uint i = 1; i <= numVars; ++i)
         {

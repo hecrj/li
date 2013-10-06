@@ -1,4 +1,4 @@
-`g++ main.cpp -O3`
+`g++ main.cpp -O3 -DVERBOSE`
 
 tests = []
 
@@ -8,14 +8,19 @@ tests = []
   end
 end
 
-tests.each do |file|
-#    start = Time.now()
-     output = `./a.out < test/vars-#{file}.cnf`
-     
-    puts output[/(UN)?SATISFIABLE/]
+decisions = []
+conflicts = []
+propagations = []
 
+tests.each do |file|
+start = Time.now()
+    output = `./a.out < test/vars-#{file}.cnf`
      
-#    time1 = Time.now() - start
+    decisions << output[/\d+ decisions/].gsub(" decisions", "")
+    conflicts << output[/\d+ conflicts/].gsub(" conflicts", "")
+    propagations << output[/\d+ propagations/].gsub(" propagations", "")
+     
+    # puts (Time.now() - start).round(3)
 
 #    start = Time.now()
 #    `picosat < #{file}`
@@ -23,3 +28,15 @@ tests.each do |file|
     
 #    puts "#{file.gsub("test/vars-", "").gsub(".cnf", "").ljust(20)} #{time1.round(3).to_s.ljust(10)} #{time2.round(3)}"
 end
+
+puts "Decisions:"
+decisions.each { |d| puts d }
+puts ""
+
+puts "Conflicts:"
+conflicts.each { |c| puts c }
+puts ""
+
+puts "Propagations:"
+propagations.each { |p| puts p }
+puts ""
