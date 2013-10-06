@@ -693,9 +693,7 @@ void learn(LearntClause* clause)
  * @return The described literal
  */
 int getNextDecisionLiteral()
-{
-    decisionCount++;
-    
+{   
     int var = 0;
     
     if(variableSetEnabled)
@@ -884,6 +882,7 @@ int main()
         ++indexOfNextLitToPropagate;
         ++decisionLevel;
         
+        decisionCount++;
         setLiteralToTrue(decisionLit); // now push decisionLit on top of the mark
     }
 }
