@@ -26,7 +26,7 @@ using namespace std;
 /**
  * CONFIG DEFINITIONS
  */
-#define INIT_VARIABLE_BUMP      10
+#define INIT_VARIABLE_BUMP      (numClauses / 2)
 #define INIT_CLAUSE_BUMP        10
 
 /**
@@ -78,8 +78,8 @@ const int maxLearntClausesLimit = 300;  // Limits the maxLearntClauses number
 int reduceCounter = 0;
 const int reduceCounterLimit = 5;
 
-heuristic variableBump = INIT_VARIABLE_BUMP;    // Initial variable bump
-heuristic clauseBump   = INIT_CLAUSE_BUMP;      // Initial clause bump
+heuristic variableBump;                 // Variable heuristic bump
+heuristic clauseBump;                   // Clause heuristic bump
 
 /**
  * Maximum activity that any variable or clause can have.
@@ -260,13 +260,18 @@ struct LearntClause : Clause
     }
 };
 
+/**
+ * Reads the clauses of the problem and initializes data structures.
+ */
 void readClauses()
 {
     // Skip comments
     char c = cin.get();
     while(c == 'c')
     {
-        while(c != '\n') c = cin.get();
+        while(c != '\n')
+            c = cin.get();
+        
         c = cin.get();
     }
     
@@ -298,13 +303,22 @@ void readClauses()
         
         clauses.push_back(clause);
     }
-        
-    for(int i = 1; i <= numVars; ++i)
-        variables[i].activity = (occurrences[index(i)] + occurrences[index(-i)]) / (numVars / 60);
     
-    variableBump = numClauses / 2;
+    // Initalize heuristics based in literal occurrences and the number of clauses
+    int scaleFactor = (numVars / 60) ? : 2;
+    
+    for(int i = 1; i <= numVars; ++i)
+        variables[i].activity = (occurrences[index(i)] + occurrences[index(-i)]) / scaleFactor;
+    
+    variableBump = INIT_VARIABLE_BUMP;
+    clauseBump = INIT_CLAUSE_BUMP;
 }
 
+/**
+ * Returns the current value in model of a given literal.
+ * @param lit A literal
+ * @return The current value in model of lit
+ */
 inline int currentValueInModel(int lit)
 {
     if(lit >= 0)
@@ -316,6 +330,10 @@ inline int currentValueInModel(int lit)
     return 1 - model[-lit];
 }
 
+/**
+ * Sets a literal to true in the model.
+ * @param lit A literal
+ */
 inline void setLiteralToTrue(int lit)
 {
     modelStack.push_back(lit);
@@ -330,6 +348,9 @@ inline void setLiteralToTrue(int lit)
     variables[var(lit)].level = decisionLevel;
 }
 
+/**
+ * Rescales all variable activity into smaller values.
+ */
 void rescaleVariableActivity()
 {
     heuristic scaleFactor = maxActivity / (numVars * 15);
@@ -340,6 +361,10 @@ void rescaleVariableActivity()
     variableBump = INIT_VARIABLE_BUMP * 15;
 }
 
+/**
+ * Bumps the activity of a variable.
+ * @param variable A variable
+ */
 void bumpVariableActivity(int variable)
 {
     if(variables[variable].activity > (maxActivity - variableBump))
@@ -348,6 +373,9 @@ void bumpVariableActivity(int variable)
     variables[variable].activity += variableBump;
 }
 
+/**
+ * Rescales all the activity of learnt clauses into smaller values.
+ */
 void rescaleClauseActivity()
 {
     heuristic scaleFactor = maxActivity / (learntClauses.size() * 15);
@@ -358,6 +386,10 @@ void rescaleClauseActivity()
     clauseBump = INIT_CLAUSE_BUMP * 15;
 }
 
+/**
+ * Bumps the activity of a learnt clause.
+ * @param clause A learnt clause
+ */
 void bumpClauseActivity(LearntClause* clause)
 {
     if(clause->activity > (maxActivity - clauseBump))
@@ -366,6 +398,23 @@ void bumpClauseActivity(LearntClause* clause)
     clause->activity += clauseBump;
 }
 
+/**
+ * Given a literal that is currently false and its clauses to watch, for every clause:
+ * - If the literal is in the first position of the clause, it's swapped with the
+ *   second position.
+ * - If the literal in the first position (first watched literal) is currently TRUE, then
+ *   the clause is satisfied. Therefore, this clause is skipped.
+ * - If first watched literal is not true, then it is needed to find a new second watched
+ *   literal. If found, the clause can be skipped.
+ * - If no second watched literal is found then it means that all literals from second
+ *   position to last position are FALSE. Thus, two cases can occur:
+ *      1. First watched literal is FALSE => Clause is false => Conflict detected
+ *      2. First watched literal is UNDEF => First watched literal is set to TRUE
+ * @param literal A literal that is currently false
+ * @param watchClauses Clauses where literal is watched
+ * @param conflictClause If a conflict is detected, this contains the conflicting clause
+ * @return True if conflict detected, false otherwise
+ */
 bool propagateGivesConflict(int literal, list<Clause*> &watchClauses, Clause* &conflictClause)
 {
     list<Clause*>::iterator it = watchClauses.begin();
@@ -390,32 +439,47 @@ bool propagateGivesConflict(int literal, list<Clause*> &watchClauses, Clause* &c
             continue;
         }
         
+        // Try to find a new second watched literal
         if(clause.findNewWatcher())
         {
-            it = watchClauses.erase(it);
+            it = watchClauses.erase(it); // Erase cclause from watchClauses of literal
             continue;
         }
         
+        // Conflict case
         if(firstWatchValue == FALSE)
         {
             conflictClause = *it;
             
+            // Bump activity of the variables in the conflicting clause
             for(int i = 0; i < clause.literals.size(); ++i)
                 bumpVariableActivity(var(clause.literals[i]));
             
-            variableBump += activityInc; // Increment variable bump
+            // Increment heuristic bumps
+            variableBump += activityInc;
             clauseBump   += activityInc;
+            
             return true;
         }
         
-        setLiteralToTrue(clause.literals[0]); // Propagate
+        // firstWatchValue is UNDEF => set it to TRUE
+        setLiteralToTrue(clause.literals[0]);
+        
+        // Update reason clause of the variable set
         variables[var(clause.literals[0])].reasonClause = *it;
+        
         ++it;
     }
     
     return false;
 }
 
+/**
+ * Propagates the last decision until a new decision is needed or a conflict
+ * is detected.
+ * @param conflictClause If a conflict is detected it contains the conflicting clause
+ * @return True if a conflict is detected, false otherwise
+ */
 bool propagateGivesConflict(Clause* &conflictClause)
 {
     while(indexOfNextLitToPropagate < modelStack.size())
@@ -431,6 +495,10 @@ bool propagateGivesConflict(Clause* &conflictClause)
     return false;
 }
 
+/**
+ * Sets as UNDEF the last literal set in the model.
+ * Pre: modelStack.back() != 0
+ */
 inline void undoOne()
 {
     int lit = modelStack.back();
@@ -442,7 +510,11 @@ inline void undoOne()
     model[x] = UNDEF;
 }
 
-inline void backtrack(int level)
+/**
+ * Backjumps to the given level.
+ * @param level Level where to jump
+ */
+inline void backjump(int level)
 {
     while(decisionLevel > level)
     {
@@ -455,6 +527,13 @@ inline void backtrack(int level)
     }
 }
 
+/**
+ * Analyzes a conflicting clause and generates a new clause that can be added
+ * to the problem to avoid the conflict in the future.
+ * @param conflict Conflicting clause to analyze
+ * @param btLevel Level where to jump
+ * @return The generated clause
+ */
 LearntClause* analyze(Clause* conflict, int &btLevel)
 {
     vector<bool> seen(numVars + 1, false);
@@ -646,7 +725,7 @@ int main()
             }
             
             LearntClause* learntClause = analyze(conflictClause, backtrackLevel);
-            backtrack(backtrackLevel);
+            backjump(backtrackLevel);
             learn(learntClause);
         }
 
