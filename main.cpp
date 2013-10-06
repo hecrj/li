@@ -28,6 +28,7 @@ using namespace std;
  */
 #define INIT_VARIABLE_BUMP      (numClauses / 2)
 #define INIT_CLAUSE_BUMP        10
+#define VARS_TO_ENABLE_SET      3000
 
 /**
  * TYPE DEFINITIONS
@@ -64,6 +65,8 @@ vector< list<Clause*> > watches;
  * in the problem clauses.
  */
 vector<uint> occurrences;
+
+bool variableSetEnabled = false;
 
 /**
  * Heuristic configuration
@@ -128,88 +131,31 @@ struct Variable
     { }
 };
 
-struct VariableOrder
+/**
+ * Establishes a strict weak ordering relation between variable indexes.
+ * @param a Variable index
+ * @param b Variable index
+ * @return True if a must be placed before b, false otherwise
+ */
+struct VariableCompare
 {
-    virtual int getNextDecisionLiteral() = 0;
-    virtual void markAsDefined(int variable){ };
-    virtual void markAsUndefined(int variable){ };
-};
-
-struct VariableMax : VariableOrder
-{
-    virtual int getNextDecisionLiteral()
+    bool operator()(const int &a, const int &b) const
     {
-        int var = 0;
-        long long int max = 0;
+        if(variables[a].activity > variables[b].activity)
+            return true;
 
-        for(uint i = 1; i <= numVars; ++i)
-        {
-            if(model[i] == UNDEF)
-            {
-                if(max < variables[i].activity)
-                {
-                    max = variables[i].activity;
-                    var = i;
-                }
-            }
-        }
+        if(variables[b].activity > variables[a].activity)
+            return false;
 
-        if(var == 0)
-            return 0;
-
-        if(occurrences[index(var)] > occurrences[index(-var)])
-            return var;
-        else
-            return -var;
+        return a < b;
     }
 };
 
-struct VariableSet : VariableOrder
-{
-    struct VariableCompare
-    {
-        bool operator()(const int &a, const int &b) const
-        {
-            if(variables[a].activity > variables[b].activity)
-                return true;
-
-            if(variables[b].activity > variables[a].activity)
-                return false;
-
-            return a < b;
-        }
-    };
-    
-    set<int, VariableCompare> variableSet;
-    
-    virtual int getNextDecisionLiteral()
-    {
-        set<int, VariableCompare>::const_iterator it = variableSet.begin();
-    
-        if(it == variableSet.end())
-            return 0;
-
-        int var = *it;
-
-        if(occurrences[index(var)] > occurrences[index(-var)])
-            return var;
-        else
-            return -var;
-    }
-    
-    virtual void markAsDefined(int variable)
-    {
-        set<int, VariableCompare>::const_iterator it = variableSet.find(variable);
-        variableSet.erase(it);
-    }
-    
-    virtual void markAsUndefined(int variable)
-    {
-        variableSet.insert(variable);
-    }
-};
-
-VariableOrder* varOrder;
+/**
+ * Set of variable indexes used when the problem has a huge number of variables to
+ * avoid walking through the whole variable vector.
+ */
+set<int, VariableCompare> variableSet;
 
 /**
  * Represents a problem clause.
@@ -373,7 +319,7 @@ void readClauses()
         clauses.push_back(clause);
     }
     
-    varOrder = new VariableMax();
+    variableSetEnabled = (numVars >= VARS_TO_ENABLE_SET);
     
     // Initalize heuristics based in literal occurrences and the number of clauses
     int scaleFactor = (numVars / 60) ? : 2;
@@ -381,7 +327,12 @@ void readClauses()
     for(int i = 1; i <= numVars; ++i)
     {
         variables[i].activity = (occurrences[index(i)] + occurrences[index(-i)]) / scaleFactor;
-        varOrder->markAsUndefined(i);
+    }
+    
+    if(variableSetEnabled)
+    {
+        for(int i = 0; i <= numVars; ++i)
+            variableSet.insert(i);
     }
     
     variableBump = INIT_VARIABLE_BUMP;
@@ -421,7 +372,11 @@ inline void setLiteralToTrue(int lit)
     
     variables[var(lit)].level = decisionLevel;
     
-    varOrder->markAsDefined(var(lit));
+    if(variableSetEnabled)
+    {
+        set<int, VariableCompare>::const_iterator it = variableSet.find(var(lit));
+        variableSet.erase(it);
+    }
 }
 
 /**
@@ -585,7 +540,8 @@ inline void undoOne()
     variables[x].reasonClause = NULL;
     model[x] = UNDEF;
     
-    varOrder->markAsUndefined(x);
+    if(variableSetEnabled)
+        variableSet.insert(x);
 }
 
 /**
@@ -729,7 +685,42 @@ void learn(LearntClause* clause)
  * of that two literals has more occurrences.
  * @return The described literal
  */
+int getNextDecisionLiteral()
+{
+    int var = 0;
+    
+    if(variableSetEnabled)
+    {
+        set<int, VariableCompare>::const_iterator it = variableSet.begin();
+    
+        if(it != variableSet.end())
+            var = *it;
+    }
+    else
+    {
+        long long int max = 0;
 
+        for(uint i = 1; i <= numVars; ++i)
+        {
+            if(model[i] == UNDEF)
+            {
+                if(max < variables[i].activity)
+                {
+                    max = variables[i].activity;
+                    var = i;
+                }
+            }
+        }
+    }
+    
+    if(var == 0)
+        return 0;
+
+    if(occurrences[index(var)] > occurrences[index(-var)])
+        return var;
+    else
+        return -var;
+}
 
 /**
  * Checks that the current model satisfies the clauses.
@@ -855,7 +846,7 @@ int main()
             }
         }
         
-        int decisionLit = varOrder->getNextDecisionLiteral();
+        int decisionLit = getNextDecisionLiteral();
         
         if(decisionLit == 0)
         {
