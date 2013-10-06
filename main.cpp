@@ -44,7 +44,10 @@ typedef long long unsigned int heuristic;
 uint numVars;                           // Number of variables
 uint numClauses;                        // Number of clauses
 uint indexOfNextLitToPropagate;         // Index of the next literal to propagate in model
-uint decisionLevel;                     // Number of decisions made
+uint decisionLevel;                     // Current decision level
+uint decisionCount;                     // Total number of decisions made
+uint conflictCount;                     // Total number of conflicts detected
+uint propagationCount;                  // Total number of propagations performed
 
 vector<Variable> variables;             // Problem variables
 vector<Clause*> clauses;                // Problem clauses
@@ -337,6 +340,8 @@ void readClauses()
     
     variableBump = INIT_VARIABLE_BUMP;
     clauseBump = INIT_CLAUSE_BUMP;
+    
+    decisionCount = propagationCount = conflictCount = 0;
 }
 
 /**
@@ -490,6 +495,7 @@ bool propagateGivesConflict(int literal, list<Clause*> &watchClauses, Clause* &c
             variableBump += activityInc;
             clauseBump   += activityInc;
             
+            conflictCount++;
             return true;
         }
         
@@ -499,6 +505,7 @@ bool propagateGivesConflict(int literal, list<Clause*> &watchClauses, Clause* &c
         // Update reason clause of the variable set
         variables[var(clause.literals[0])].reasonClause = *it;
         
+        propagationCount++;
         ++it;
     }
     
@@ -687,6 +694,8 @@ void learn(LearntClause* clause)
  */
 int getNextDecisionLiteral()
 {
+    decisionCount++;
+    
     int var = 0;
     
     if(variableSetEnabled)
@@ -773,6 +782,17 @@ void reduceLearntClauses()
 }
 
 /**
+ * Prints the total number of decisions, conflicts and propagations occurred while
+ * solving the problem.
+ */
+void printSummary()
+{
+    cout << decisionCount << " decisions" << endl;
+    cout << conflictCount << " conflicts" << endl;
+    cout << propagationCount << " propagations" << endl;
+}
+
+/**
  * Reads a SAT problem and prints whether is satisfiable or not.
  * @return 10 if unsatisfiable, 20 otherwise
  */
@@ -812,6 +832,8 @@ int main()
             if(decisionLevel == 0)
             {
                 cout << "UNSATISFIABLE" << endl;
+                printSummary();
+                
                 return 10;
             }
             
@@ -852,6 +874,8 @@ int main()
         {
             checkmodel();
             cout << "SATISFIABLE" << endl;
+            printSummary();
+            
             return 20;
         }
         

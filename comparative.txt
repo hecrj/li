@@ -1,4 +1,4 @@
-Samples              Héctor     Picosat
+Sample               Héctor     Picosat
 100-1                0.003      0.003
 100-2                0.004      0.005
 100-3                0.011      0.007
@@ -49,3 +49,6 @@ Samples              Héctor     Picosat
 300-8                33.546     11.465
 300-9                7.885      3.385
 300-10               14.139     3.858
+
+Time is in seconds.
+Benchmark performed in an overclocked Intel i5 2500k @ 4.8GHz.
