@@ -1,4 +1,4 @@
-:-include(sud77).
+:-include(sud78).
 :-dynamic(varNumber/3).
 symbolicOutput(0). % set to 1 to see symbolic output only; 0 otherwise.
 cells(9, 9).
@@ -75,7 +75,8 @@ main:-  assert(numClauses(0)), assert(numVars(0)),
 	tell(clauses), writeClauses, told,
 	tell(header),  writeHeader,  told,
 	unix('cat header clauses > infile.cnf'),
-	unix('picosat -v -o model infile.cnf'),
+        unix('make mySat.out'),
+	unix('./mySat.out < infile.cnf > model'),
 	unix('cat model'),
 	see(model), readModel(M), seen, displaySol(M),
 	halt.

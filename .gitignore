@@ -2,3 +2,8 @@ nbproject/private/
 dist/
 build/
 *.out
+header
+model
+infile.cnf
+clauses
+gen*.cpp

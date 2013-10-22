@@ -795,9 +795,26 @@ void reduceLearntClauses()
  */
 void printSummary()
 {
-    cout << decisionCount << " decisions" << endl;
-    cout << conflictCount << " conflicts" << endl;
-    cout << propagationCount << " propagations" << endl;
+    cout << "c " << decisionCount << " decisions" << endl;
+    cout << "c " << conflictCount << " conflicts" << endl;
+    cout << "c " << propagationCount << " propagations" << endl;
+}
+
+
+void printModel()
+{
+    for(int i = 1; i < model.size(); ++i)
+    {
+        if(i % 20 == 0)
+            cout << endl;
+        
+        if(model[i] == FALSE)
+            cout << '-';
+        
+        cout << i << ' ';
+    }
+    
+    cout << endl;
 }
 #endif
 
@@ -888,7 +905,8 @@ int main()
             cout << "SATISFIABLE" << endl;
             
 #ifdef VERBOSE
-                printSummary();
+            printModel();
+            printSummary();
 #endif
             
             return 20;
