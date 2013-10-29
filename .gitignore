@@ -7,3 +7,4 @@ model
 infile.cnf
 clauses
 gen*.cpp
+*.ps
