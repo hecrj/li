@@ -1,4 +1,4 @@
-:-include(test01).
+:-include(test02).
 :-include(writeClauses).
 :-include(displayRodear).
 :-dynamic(varNumber/3).
@@ -25,17 +25,33 @@ exactlyOneAdjacent(I, J):-
 	atMostOne(A).
 
 exactlyTwoAdjacents(I, J):-
-	adjacents(I, J, A)
-	atLeastTwo(A),
-	atMostTwo(A).
+	adjacents(I, J, A),
+	exactlyTwo(A).
 
 atMostOne([X|L]):-
-	writeNegated(X, L),
+	atMostOne(X, L),
 	atMostOne(L).
 atMostOne([]).
 
-atLeastTwo([X|L]):-
-.
+atMostOne(V, [X|L]):-
+	writeClause([ \+V, \+X]),
+	atMostOne(X, L).
+atMostOne(_, []).
+
+exactlyTwo([V|L]):-
+	exactlyTwo(V, L).
+exactlyTwo([]).
+
+exactlyTwo(V, [X|L]):-
+	% Ladder encoding
+	writeClause([ \+V, V-a ]),
+	writeClause([ \+V-a, X ]),
+	writeClause([ \+V-b, X-b ]),
+	writeClause([ \+V-a, \+X, X-b ]),
+	writeClause([ \+V-b, \+X ]),
+	exactlyTwo(X, L).
+
+exactlyTwo(_, []).
 
 atMostTwo([X|L]):-
 	atMostTwo(X, L).
@@ -49,11 +65,5 @@ atMostTwo(_, []).
 atMostTwo(V1, V2, [X|L]):-
 	writeClause([ \+V1, \+V2, \+X ]),
 	atMostTwo(L).
-atMostTwo(V1, V2, [_]).
+atMostTwo(_, _, []).
 
-atMostTwo():-
-
-writeNegated(V, [X|L]):-
-	writeClause([ \+V, \+X]),
-	writeNegated(X, L).
-writeNegated(_, []).

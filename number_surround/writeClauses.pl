@@ -9,7 +9,7 @@ main:-  assert(numClauses(0)), assert(numVars(0)),
 	unix('./mySat.out < infile.cnf > model'),
 	unix('cat model'),
 	see(model), readModel(M), seen, displaySol(M),
-	unix('open graph.ps'),
+	unix('gv graph.ps'),
 	halt.
 
 var2num(T,N):- hash_term(T,Key), varNumber(Key,T,N),!.

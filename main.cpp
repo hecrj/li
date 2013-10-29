@@ -332,7 +332,7 @@ void readClauses()
     
     for(int i = 1; i <= numVars; ++i)
     {
-        variables[i].activity = (occurrences[index(i)] + occurrences[index(-i)]) / scaleFactor;
+        variables[i].activity = ((occurrences[index(i)] + occurrences[index(-i)]) / scaleFactor) ? : 1;
     }
     
     if(variableSetEnabled)
