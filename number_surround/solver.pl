@@ -45,10 +45,11 @@ exactlyTwo([]).
 exactlyTwo(V, [X|L]):-
 	% Ladder encoding
 	writeClause([ \+V, V-a ]),
-	writeClause([ \+V-a, X ]),
+	writeClause([ \+V-a, X-a ]),
 	writeClause([ \+V-b, X-b ]),
 	writeClause([ \+V-a, \+X, X-b ]),
 	writeClause([ \+V-b, \+X ]),
+	
 	exactlyTwo(X, L).
 
 exactlyTwo(_, []).
