@@ -1,4 +1,4 @@
-:-include(test02).
+:-include(entradaRodear1).
 :-include(writeClauses).
 :-include(displayRodear).
 :-dynamic(varNumber/3).
@@ -14,20 +14,34 @@ adjacents(I, J, A):-
 kEdges:- rows(R), columns(C),
 	between(1, R, I), between(1, C, J),
 	num(I, J, N),
-	(N = 1 -> exactlyOneAdjacent(I, J) ; true),
-	(N = 2 -> exactlyTwoAdjacents(I, J) ; true),
+	adjacents(I, J, A),
+	(N = 0 -> exactlyZero(A) ; true),
+	(N = 1 -> exactlyOne(A) ; true),
+	(N = 2 -> exactlyTwo(A) ; true),
+	(N = 3 -> exactlyThree(A) ; true),
 	fail.
 kEdges.
 
-exactlyOneAdjacent(I, J):-
-	adjacents(I, J, A),
+exactlyZero([V1, V2, V3, V4]):-
+	% All of them need to be false.
+	writeClause([ \+V1 ]),
+	writeClause([ \+V2 ]),
+	writeClause([ \+V3 ]),
+	writeClause([ \+V4 ]).
+
+exactlyOne(A):-
 	writeClause(A),
 	atMostOne(A).
 
-exactlyTwoAdjacents(I, J):-
-	adjacents(I, J, A),
-	exactlyTwo(A).
+exactlyTwo(A):-
+	atMostTwo(A),
+	atLeastTwo(A).
+	
+exactlyThree(A):-
+	atMostThree(A),
+	atLeastThree(A).
 
+% At Most One
 atMostOne([X|L]):-
 	atMostOne(X, L),
 	atMostOne(L).
@@ -38,33 +52,34 @@ atMostOne(V, [X|L]):-
 	atMostOne(X, L).
 atMostOne(_, []).
 
-exactlyTwo([V|L]):-
-	exactlyTwo(V, L).
-exactlyTwo([]).
+% At Most Two
+atMostTwo([V1, V2, V3, V4]):-
+	% BDD to CNF
+	writeClause([ \+V1, \+V2, \+V3 ]),
+	writeClause([ \+V1, V2, \+V3, \+V4]),
+	writeClause([ \+V1, \+V2, V3, \+V4 ]),
+	writeClause([ V1, \+V2, \+V3, \+V4 ]).
 
-exactlyTwo(V, [X|L]):-
-	% Ladder encoding
-	writeClause([ \+V, V-a ]),
-	writeClause([ \+V-a, X-a ]),
-	writeClause([ \+V-b, X-b ]),
-	writeClause([ \+V-a, \+X, X-b ]),
-	writeClause([ \+V-b, \+X ]),
+% At Least Two
+atLeastTwo([V1, V2, V3, V4]):-
+	% BDD to CNF
+	writeClause([ V1, V2, V3 ]),
+	writeClause([ \+V1, V2, V3, V4 ]),
+	writeClause([ V1, \+V2, V3, V4 ]),
+	writeClause([ V1, V2, \+V3, V4 ]).
 	
-	exactlyTwo(X, L).
-
-exactlyTwo(_, []).
-
-atMostTwo([X|L]):-
-	atMostTwo(X, L).
-atMostTwo([]).
-
-atMostTwo(V1, [V2|L]):-
-	atMostTwo(V1, V2, L),
-	atMostTwo(V2, L).
-atMostTwo(_, []).
-
-atMostTwo(V1, V2, [X|L]):-
-	writeClause([ \+V1, \+V2, \+X ]),
-	atMostTwo(L).
-atMostTwo(_, _, []).
+% At Least Three
+atLeastThree([V1, V2, V3, V4]):-
+	% BDD to CNF
+	writeClause([ V1, V2 ]),
+	writeClause([ V1, \+V2, V3 ]),
+	writeClause([ V1, \+V2, \+V3, V4 ]),
+	writeClause([ \+V1, V2, V3 ]),
+	writeClause([ \+V1, \+V2, V3, V4 ]),
+	writeClause([ \+V1, V2, \+V3, V4 ]).
+	
+% At Most Three
+atMostThree([V1, V2, V3, V4]):-
+	% One of them needs to be false
+	writeClause([ \+V1, \+V2, \+V3, \+V4 ]).
 
