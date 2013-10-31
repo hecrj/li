@@ -1,5 +1,5 @@
-:-include(entradaRodear6).
-:-include(writeClauses).
+:-include('test/entradaRodear6').
+:-include('../writeClauses').
 :-include(displayRodear).
 :-dynamic(varNumber/3).
 symbolicOutput(0).

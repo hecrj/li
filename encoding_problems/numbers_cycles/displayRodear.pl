@@ -81,4 +81,5 @@ displaySol(M):-
     writeNumbers,
     writeSolution(M),
     writeln('showpage'),
-    told.
+    told,
+    unix('gv graph.ps').

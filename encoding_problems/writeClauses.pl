@@ -5,11 +5,10 @@ main:-  assert(numClauses(0)), assert(numVars(0)),
 	tell(clauses), writeClauses, told,
 	tell(header),  writeHeader,  told,
 	unix('cat header clauses > infile.cnf'),
-    	unix('make mySat.out > /dev/null'),
-	unix('./mySat.out < infile.cnf > model'),
+	unix('thorsat < infile.cnf > model'),
 	unix('cat model'),
 	see(model), readModel(M), seen, displaySol(M),
-	unix('gv graph.ps'),
+	unix('rm infile.cnf header model clauses'),
 	halt.
 
 var2num(T,N):- hash_term(T,Key), varNumber(Key,T,N),!.
