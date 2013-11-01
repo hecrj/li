@@ -1,4 +1,4 @@
-:-include('test/test01').
+:-include('test/entradaFlow14').
 :-include('../writeClauses').
 :-include(displayFlow).
 :-dynamic(varNumber/3).
@@ -144,9 +144,7 @@ negate(\+X, X).
 negate(X, \+X).
 atMostOne([]).
 atMostOne(L):-
-	length(L, N),
-	log2(N, X),
-	(X > 3 -> heuleAMO(L) ; binaryAMO(L)),
+	heuleAMO(L),
 	retract( auxId(A) ),
 	A1 is A + 1,
 	assert( auxId(A1) ), !.
