@@ -1,4 +1,4 @@
-:-include('test/entradaFlow9').
+:-include('test/test01').
 :-include('../writeClauses').
 :-include(displayFlow).
 :-dynamic(varNumber/3).
@@ -140,20 +140,27 @@ exactlyThree(A):-
 % At Most One
 auxId(0).
 log2(N, X):- X is ceil(log(N) / log(2)).
+negate(\+X, X).
+negate(X, \+X).
 atMostOne([]).
 atMostOne(L):-
 	length(L, N),
 	log2(N, X),
-	atMostOne(L, 0, X),
+	(X > 3 -> heuleAMO(L) ; binaryAMO(L)),
 	retract( auxId(A) ),
 	A1 is A + 1,
 	assert( auxId(A1) ), !.
 
-atMostOne([], _, _).
-atMostOne([V|L], I, N):-
+binaryAMO(L):-
+	length(L, N),
+	log2(N, X),
+	binaryAMO(L, 0, X).
+	
+binaryAMO([], _, _).
+binaryAMO([V|L], I, N):-
 	binaryCode(V, I, N, 0),
 	I1 is I + 1,
-	atMostOne(L, I1, N).
+	binaryAMO(L, I1, N).
 
 binaryCode(_, _, N, N).
 binaryCode(V, I, N, P):-
@@ -164,6 +171,35 @@ binaryCode(V, I, N, P):-
 	I2 is floor(I / 2),
 	P1 is P + 1,
 	binaryCode(V, I2, N, P1).
+	
+heuleAMO(L):-
+	heuleAMO(L, 0).
+	
+heuleAMO([V1, V2, V3, V4, V5 | L], D):-
+	auxId(A),
+	Aux = heule-A-D,
+	simpleAMO([V1, V2, V3, V4, Aux]),
+	append(L, [V5, \+Aux], L1),
+	D1 is D + 1,
+	heuleAMO(L1, D1).
+
+heuleAMO(L, _):-
+	simpleAMO(L).
+
+heuleAMO([_], _).
+heuleAMO([], _).
+
+simpleAMO([]).
+simpleAMO([V1 | L]):-
+	negate(V1, V1n),
+	simpleAMO(V1n, L),
+	simpleAMO(L).
+
+simpleAMO(_, []).
+simpleAMO(V1n, [V2|L]):-
+	negate(V2, V2n),
+	writeClause([ V1n, V2n ]),
+	simpleAMO(V1n, L).
 
 % At Most Two
 atMostTwo([V1, V2, V3, V4]):-
