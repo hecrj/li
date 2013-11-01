@@ -8,3 +8,4 @@ infile.cnf
 clauses
 gen*.cpp
 *.ps
+truth

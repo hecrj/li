@@ -1,4 +1,4 @@
-:-include('test/entradaRodear6').
+:-include('test/entradaRodear9').
 :-include('../writeClauses').
 :-include(displayRodear).
 :-dynamic(varNumber/3).
