@@ -1,10 +1,11 @@
-:-include('test/entradaFlow14').
+:-include('test/entradaFlow9').
 :-include('../writeClauses').
 :-include(displayFlow).
 :-dynamic(varNumber/3).
+:-dynamic(auxId/1).
 symbolicOutput(0).
 
-writeClauses:- successors, parents, initials, distances, colors.
+writeClauses:- successors, parents, initials, colors, distances.
 
 adjacentsToVertex(I, J, A):-
 	I1 is I - 1,
@@ -25,7 +26,7 @@ successors:-
 	size(N),
 	between(1, N, I), between(1, N, J),
 	adjacentsToVertex(I, J, A),
-	(c(_, _,_, I, J) -> exactlyZero(A) ; exactlyOne(A, successor)),
+	(c(_, _,_, I, J) -> exactlyZero(A) ; exactlyOne(A)),
 	fail.
 successors.
 
@@ -33,7 +34,7 @@ parents:-
 	size(N),
 	between(1, N, I), between(1, N, J),
 	parentsToVertex(I, J, P),
-	(c(_, I, J, _, _) -> exactlyZero(P) ; exactlyOne(P, parent)),
+	(c(_, I, J, _, _) -> exactlyZero(P) ; exactlyOne(P)),
 	fail.
 parents.
 
@@ -46,7 +47,7 @@ oneColorPerCell:-
 	size(N),
 	between(1, N, I), between(1, N, J),
 	findall(col-I-J-C, c(C, _,_, _,_), L),
-	atMostOne(L, color),
+	exactlyOne(L),
 	fail.
 oneColorPerCell.
 
@@ -84,7 +85,7 @@ oneDistancePerCell:-
 	N2 is N*N,
 	between(1, N, I), between(1, N, J),
 	findall(d-I-J-D, between(0, N2, D), L),
-	exactlyOne(L, distance),
+	exactlyOne(L),
 	fail.
 oneDistancePerCell.
 
@@ -124,9 +125,9 @@ exactlyZero([X|L]):-
 	exactlyZero(L).
 exactlyZero([]).
 
-exactlyOne(A, Aux):-
+exactlyOne(A):-
 	writeClause(A),
-	atMostOne(A, Aux).
+	atMostOne(A).
 
 exactlyTwo(A):-
 	atMostTwo(A),
@@ -137,19 +138,32 @@ exactlyThree(A):-
 	atLeastThree(A).
 
 % At Most One
-atMostOne([V1|L], Aux):-
-	atMostOne(V1, L, Aux).
-atMostOne([], _).
+auxId(0).
+log2(N, X):- X is ceil(log(N) / log(2)).
+atMostOne([]).
+atMostOne(L):-
+	length(L, N),
+	log2(N, X),
+	atMostOne(L, 0, X),
+	retract( auxId(A) ),
+	A1 is A + 1,
+	assert( auxId(A1) ), !.
 
-atMostOne(V1, [V2|L], Aux):-
-	% Ladder encoding: O(L)
-	writeClause([ \+V1, V1-Aux ]),
-	writeClause([ \+V1-Aux, \+V2]),
-	writeClause([ \+V1-Aux, V2-Aux]),
-	atMostOne(V2, L, Aux).
+atMostOne([], _, _).
+atMostOne([V|L], I, N):-
+	binaryCode(V, I, N, 0),
+	I1 is I + 1,
+	atMostOne(L, I1, N).
 
-atMostOne(V, [], Aux):-
-	writeClause([ \+V, V-Aux ]).
+binaryCode(_, _, N, N).
+binaryCode(V, I, N, P):-
+	B is mod(I, 2),
+	auxId(A),
+	(B = 0 -> C = [ \+V, \+b-A-P ] ; C = [ \+V, b-A-P ]),
+	writeClause(C),
+	I2 is floor(I / 2),
+	P1 is P + 1,
+	binaryCode(V, I2, N, P1).
 
 % At Most Two
 atMostTwo([V1, V2, V3, V4]):-
