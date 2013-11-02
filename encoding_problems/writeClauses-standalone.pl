@@ -1,15 +1,14 @@
 % Write clauses
+
 main:- symbolicOutput(1), !, writeClauses, halt. % escribir bonito, no ejecutar
 main:-  assert(numClauses(0)), assert(numVars(0)),
 	tell(clauses), writeClauses, told,
 	tell(header),  writeHeader,  told,
 	unix('cat header clauses > infile.cnf'),
-	unix('thorsat < infile.cnf > model'),
+	unix('picosat -v -o model infile.cnf'),
 	unix('cat model'),
 	see(model), readModel(M), seen,
-	tell(truth), writeTruth(M), told,
 	displaySol(M),
-	unix('rm infile.cnf header model clauses'),
 	halt.
 
 var2num(T,N):- hash_term(T,Key), varNumber(Key,T,N),!.
@@ -38,10 +37,3 @@ readWord(99,W):- repeat, get_code(Ch), member(Ch,[-1,10]), !, get_code(Ch1), rea
 readWord(-1,_):-!, fail. %end of file
 readWord(C,[]):- member(C,[10,32]), !. % newline or white space marks end of word
 readWord(Char,[Char|W]):- get_code(Char1), readWord(Char1,W), !.
-%========================================================================================
-
-writeTruth([X|M]):-
-    num2var(X, N),
-    write(N), nl,
-    writeTruth(M).
-writeTruth([]).
