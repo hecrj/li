@@ -8,7 +8,7 @@ exactlyZero([X|L]):-
 exactlyZero([]).
 
 exactlyOne(A):-
-	writeClause(A),
+	atLeastOne(A),
 	atMostOne(A).
 
 exactlyTwo(A):-
@@ -18,6 +18,10 @@ exactlyTwo(A):-
 exactlyThree(A):-
 	atMostThree(A),
 	atLeastThree(A).
+	
+% At Least One
+atLeastOne(A):-
+	writeClause(A).
 
 % At Most One
 auxId(0).
@@ -55,11 +59,11 @@ binaryCode(V, I, N, P):-
 heuleAMO(L):-
 	heuleAMO(L, 0).
 	
-heuleAMO([V1, V2, V3, V4, V5 | L], D):-
+heuleAMO([V1, V2, V3, V4, V5, V6 | L], D):-
 	auxId(A),
 	Aux = heule-A-D,
 	simpleAMO([V1, V2, V3, V4, Aux]),
-	append(L, [V5, \+Aux], L1),
+	append(L, [V5, V6, \+Aux], L1),
 	D1 is D + 1,
 	heuleAMO(L1, D1).
 

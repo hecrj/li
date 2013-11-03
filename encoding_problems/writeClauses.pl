@@ -9,7 +9,7 @@ main:-  assert(numClauses(0)), assert(numVars(0)),
 	see(model), readModel(M), seen,
 	tell(truth), writeTruth(M), told,
 	displaySol(M),
-	unix('rm infile.cnf header model clauses'),
+	%unix('rm infile.cnf header model clauses'),
 	halt.
 
 var2num(T,N):- hash_term(T,Key), varNumber(Key,T,N),!.

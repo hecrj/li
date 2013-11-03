@@ -397,7 +397,7 @@ void rescaleVariableActivity()
     heuristic scaleFactor = maxActivity / (numVars * 15);
     
     for(int i = 1; i <= numVars; ++i)
-        variables[i].activity /= scaleFactor;
+        variables[i].activity = (variables[i].activity / scaleFactor) ? : 1;
     
     variableBump = INIT_VARIABLE_BUMP * 15;
 }
