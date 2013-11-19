@@ -7,14 +7,28 @@ symbolicOutput(0).
 
 writeClauses:- cycles, kEdges.
 
+up(1, _, []).
+up(I, J, [v-I1-J]):- I1 is I-1.
+
+left(_, 1, []).
+left(I, J, [h-I-J1]):- J1 is J-1.
+
+down(I, _, []):- rows(R), I1 is I-1, I1 >= R.
+down(I, J, [v-I-J]).
+
+right(_, J, []):- columns(C), J1 is J-1, J1 >= C.
+right(I, J, [h-I-J]).
+
 adjacentsToVertex(I, J, A):-
-	I1 is I - 1,
-	J1 is J - 1,
-	rows(R), columns(C),
-	(I  > 1 -> append([], [v-I1-J], L1) ; L1 = []),
-	(I1 < R -> append(L1, [v-I-J],  L2) ; L2 = L1),
-	(J  > 1 -> append(L2, [h-I-J1], L3) ; L3 = L2),
-	(J1 < C -> append(L3, [h-I-J],  A)  ; A  = L3).
+	up(I, J, U),
+	down(I, J, D),
+	left(I, J, L),
+	right(I, J, R),
+	
+	append([], U, L1),
+	append(L1, D, L2),
+	append(L2, L, L3),
+	append(L3, R, A).
 
 adjacents(I, J, A):-
 	I1 is I+1,
@@ -54,9 +68,11 @@ kEdges:-
 	between(1, R, I), between(1, C, J),
 	num(I, J, N),
 	adjacents(I, J, A),
-	(N = 0 -> exactlyZero(A) ; true),
-	(N = 1 -> exactlyOne(A) ; true),
-	(N = 2 -> exactlyTwo(A) ; true),
-	(N = 3 -> exactlyThree(A) ; true),
+	kEdges(N, A),
 	fail.
 kEdges.
+
+kEdges(0, A):- exactlyZero(A).
+kEdges(1, A):- exactlyOne(A).
+kEdges(2, A):- exactlyTwo(A).
+kEdges(3, A):- exactlyThree(A).
