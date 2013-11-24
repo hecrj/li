@@ -2,8 +2,8 @@
 :-include('displayRodear').
 :-include('../writeClauses').
 :-include('../cardinalityConstraints').
-:-dynamic(varNumber/3).
 symbolicOutput(0).
+useMySolver(0). % Set this to 1 to use my sat solver
 
 writeClauses:- cycles, kEdges.
 

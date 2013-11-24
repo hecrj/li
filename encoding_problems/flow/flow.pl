@@ -2,8 +2,8 @@
 :-include('../writeClauses').
 :-include('../cardinalityConstraints').
 :-include('displayFlow').
-:-dynamic(varNumber/3).
 symbolicOutput(0).
+useMySolver(0). % Set this to 1 to use my sat solver
 
 writeClauses:- successors, parents, initials, colors, distances.
 

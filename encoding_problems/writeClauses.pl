@@ -1,15 +1,29 @@
 % Write clauses
+:-dynamic(varNumber/3).
 
 main:- symbolicOutput(1), !, writeClauses, halt. % escribir bonito, no ejecutar
 main:-  assert(numClauses(0)), assert(numVars(0)),
 	tell(clauses), writeClauses, told,
 	tell(header),  writeHeader,  told,
-	unix('cat header clauses > infile.cnf'),
-	unix('picosat -v -o model infile.cnf'),
+	unix('cat header clauses > infile.cnf'), !,
+	solve,
 	unix('cat model'),
 	see(model), readModel(M), seen,
 	displaySol(M),
 	halt.
+
+solve:- useMySolver(0), unix('picosat -v -o model infile.cnf'), !.
+solve:-
+	source_file(S),
+	atomic_list_concat(L, 'encoding_problems', S),
+	L = [Path, _], !,
+	
+	string_concat('cd ', Path, Cd),
+	string_concat(Cd, 'thorsat && make', Make),
+	string_concat(Path, 'thorsat/thorsat < infile.cnf > model', Solve),
+	
+	unix(Make),
+	unix(Solve).
 
 var2num(T,N):- hash_term(T,Key), varNumber(Key,T,N),!.
 var2num(T,N):- retract(numVars(N0)), N is N0+1, assert(numVars(N)), hash_term(T,Key),
