@@ -34,27 +34,6 @@ atMostOne(L):-
 	retract( auxId(A) ),
 	A1 is A + 1,
 	assert( auxId(A1) ), !.
-
-binaryAMO(L):-
-	length(L, N),
-	log2(N, X),
-	binaryAMO(L, 0, X).
-	
-binaryAMO([], _, _).
-binaryAMO([V|L], I, N):-
-	binaryCode(V, I, N, 0),
-	I1 is I + 1,
-	binaryAMO(L, I1, N).
-
-binaryCode(_, _, N, N).
-binaryCode(V, I, N, P):-
-	B is mod(I, 2),
-	auxId(A),
-	(B = 0 -> C = [ \+V, \+b-A-P ] ; C = [ \+V, b-A-P ]),
-	writeClause(C),
-	I2 is floor(I / 2),
-	P1 is P + 1,
-	binaryCode(V, I2, N, P1).
 	
 heuleAMO(L):-
 	heuleAMO(L, 0).
@@ -87,7 +66,7 @@ simpleAMO(V1n, [V2|L]):-
 
 % At Most Two
 atMostTwo([V1, V2, V3, V4]):-
-	% BDD to CNF
+	% Obtained translating a BDD to CNF
 	writeClause([ \+V1, \+V2, \+V3 ]),
 	writeClause([ \+V1, V2, \+V3, \+V4]),
 	writeClause([ \+V1, \+V2, V3, \+V4 ]),
@@ -100,7 +79,7 @@ atMostTwo([_, _]).
 
 % At Least Two
 atLeastTwo([V1, V2, V3, V4]):-
-	% BDD to CNF
+	% Obtained translating a BDD to CNF
 	writeClause([ V1, V2, V3 ]),
 	writeClause([ \+V1, V2, V3, V4 ]),
 	writeClause([ V1, \+V2, V3, V4 ]),
@@ -108,7 +87,7 @@ atLeastTwo([V1, V2, V3, V4]):-
 	
 % At Least Three
 atLeastThree([V1, V2, V3, V4]):-
-	% BDD to CNF
+	% Obtained translating a BDD to CNF
 	writeClause([ V1, V2 ]),
 	writeClause([ V1, \+V2, V3 ]),
 	writeClause([ V1, \+V2, \+V3, V4 ]),
@@ -120,4 +99,3 @@ atLeastThree([V1, V2, V3, V4]):-
 atMostThree([V1, V2, V3, V4]):-
 	% One of them needs to be false
 	writeClause([ \+V1, \+V2, \+V3, \+V4 ]).
-
