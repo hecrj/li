@@ -8,14 +8,18 @@ camino( EstadoActual, EstadoFinal, CaminoHastaAhora, CaminoTotal ):-
 	camino( EstSiguiente, EstadoFinal, [EstSiguiente|CaminoHastaAhora], CaminoTotal ).
 
 solucionOptima(I, F):-
-	nat(N), % Buscamos solucion de "coste" 0; si no, de 1, etc.
-	camino(I, F, [I], C), % En "hacer aguas": -un estado es [cubo5,cubo8], y
-	length(C, N), % -el coste es la longitud de C.
+	nat(N), % Buscamos solucion de "coste" 0; si no, de 1, etc.
+	camino(I, F, [I], C),
+	coste(C, N),
 	reverse(C, R),
 	write(R), nl,
 	write(N).
 
+coste([], 0).
+
 cubos:- solucionOptima(cubos-0-0, cubos-0-4).
+
+coste([cubos-_-_|L], N):- coste(L, C), N is C + 1.
 
 unPaso(cubos-X-_, cubos-X-0).
 unPaso(cubos-X-_, cubos-X-8).
@@ -29,6 +33,8 @@ unPaso(cubos-X1-X2, cubos-Y1-Y2):-
 	Y2 is max(X2 - (5 - X1), 0).
 
 misioneros:- solucionOptima(mision-i-[3, 3]-[0, 0], mision-d-[0, 0]-[3, 3]).
+
+coste([mision-_-_-_|L], N):- coste(L, C), N is C + 1.
 
 compLado(0, _).
 compLado(M, C):- M >= C.
