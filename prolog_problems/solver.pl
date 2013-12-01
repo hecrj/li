@@ -5,11 +5,13 @@ camino( E,E, C,C ).
 camino( EstadoActual, EstadoFinal, CaminoHastaAhora, CaminoTotal ):-
 	unPaso( EstadoActual, EstSiguiente ),
 	\+member(EstSiguiente, CaminoHastaAhora),
-	%write(EstSiguiente),
+	%write(EstadoActual), nl,
+	%write(CaminoHastaAhora), nl,
 	camino( EstSiguiente, EstadoFinal, [EstSiguiente|CaminoHastaAhora], CaminoTotal ).
 
 solucionOptima(I, F):-
 	nat(N), % Buscamos solucion de "coste" 0; si no, de 1, etc.
+	%write(N), nl,
 	camino(I, F, [I], C),
 	coste(C, N),
 	reverse(C, R),
