@@ -32,14 +32,13 @@ unPaso(puente-d-SinCruzar1-Cruzado1, puente-i-SinCruzar2-Cruzado2):-
 	cruzar1(Cruzado1, SinCruzar1, Cruzado2, SinCruzar2).
 
 cruzar2(SinCruzar1, Cruzado1, SinCruzar2, Cruzado2):-
-	member(X, SinCruzar1), X \= 0,
-	member(Y, SinCruzar1), Y \= 0,
-	X \= Y,
+	member(X, SinCruzar1),
+	member(Y, SinCruzar1),
 	cruza(X, SinCruzar1, Cruzado1, SinCruzar, Cruzado),
 	cruza(Y, SinCruzar, Cruzado, SinCruzar2, Cruzado2).
 
 cruzar1(SinCruzar1, Cruzado1, SinCruzar2, Cruzado2):-
-	member(X, SinCruzar1), X \= 0,
+	member(X, SinCruzar1),
 	cruza(X, SinCruzar1, Cruzado1, SinCruzar2, Cruzado2).
 
 cruza(1, [1, S1, S2, S3], [0, C1, C2, C3], [0, S1, S2, S3], [1, C1, C2, C3]).

@@ -5,7 +5,7 @@ camino( E,E, C,C ).
 camino( EstadoActual, EstadoFinal, CaminoHastaAhora, CaminoTotal ):-
 	unPaso( EstadoActual, EstSiguiente ),
 	\+member(EstSiguiente, CaminoHastaAhora),
-	%write(EstadoActual), nl,
+	%write(EstSiguiente), nl,
 	%write(CaminoHastaAhora), nl,
 	camino( EstSiguiente, EstadoFinal, [EstSiguiente|CaminoHastaAhora], CaminoTotal ).
 
