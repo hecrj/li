@@ -1,47 +1,35 @@
 :-include('../solver.pl').
 
-solve:- puente.
+solve:- puente([1, 2, 4, 5, 8]).
 
-puente:- solucionOptima(puente-i-[1,2,5,8]-[0,0,0,0], puente-d-[0,0,0,0]-[1,2,5,8]).
+puente(P):-
+	ceros(P, Z),
+	solucionOptima(puente-i-P-Z-0, puente-d-Z-P-_).
+
+ceros([], []).
+ceros([_ | P], [0 | Z]):- ceros(P, Z).
 
 coste([], 0).
-coste([puente-_-_-_], 0).
-coste([puente-d-_-Despues, X | L], C):-
-	X = puente-i-Antes-_,
-	coste(Antes, Despues, [X | L], C).
+coste([puente-_-_-_-C], C).
+coste([puente-_-_-_-C | _], C).
 
-coste([puente-i-Despues-_, X | L], C):-
-	X = puente-d-_-Antes,
-	coste(Antes, Despues, [X | L], C).
+unPaso(puente-i-SinCruzar1-Cruzado1-C1, puente-d-SinCruzar2-Cruzado2-C2):-
+	cruzar(SinCruzar1, Cruzado1, C1, SinCruzar2, Cruzado2, C2).
 
-coste(Antes, Despues, L, C):-
-	intersection(Antes, Despues, Cruzan),
-	max(Cruzan, C1),
-	coste(L, C2),
-	C is C1 + C2.
+unPaso(puente-d-SinCruzar1-Cruzado1-C1, puente-i-SinCruzar2-Cruzado2-C2):-
+	cruzar(Cruzado1, SinCruzar1, C1, Cruzado2, SinCruzar2, C2).
 
-max([], 0).
-max([X], X).
-max([X|L], X):- max(L, Y), X >= Y.
-max([X|L], N):- max(L, N), N > X.
-
-unPaso(puente-i-SinCruzar1-Cruzado1, puente-d-SinCruzar2-Cruzado2):-
-	cruzar2(SinCruzar1, Cruzado1, SinCruzar2, Cruzado2).
-
-unPaso(puente-d-SinCruzar1-Cruzado1, puente-i-SinCruzar2-Cruzado2):-
-	cruzar1(Cruzado1, SinCruzar1, Cruzado2, SinCruzar2).
-
-cruzar2(SinCruzar1, Cruzado1, SinCruzar2, Cruzado2):-
+cruzar(SinCruzar1, Cruzado1, C1, SinCruzar2, Cruzado2, C2):-
 	member(X, SinCruzar1),
 	member(Y, SinCruzar1),
 	cruza(X, SinCruzar1, Cruzado1, SinCruzar, Cruzado),
-	cruza(Y, SinCruzar, Cruzado, SinCruzar2, Cruzado2).
+	cruza(Y, SinCruzar, Cruzado, SinCruzar2, Cruzado2),
+	C2 is C1 + max(X, Y).
 
-cruzar1(SinCruzar1, Cruzado1, SinCruzar2, Cruzado2):-
+cruzar(SinCruzar1, Cruzado1, C1, SinCruzar2, Cruzado2, C2):-
 	member(X, SinCruzar1),
-	cruza(X, SinCruzar1, Cruzado1, SinCruzar2, Cruzado2).
+	cruza(X, SinCruzar1, Cruzado1, SinCruzar2, Cruzado2),
+	C2 is C1 + X.
 
-cruza(1, [1, S1, S2, S3], [0, C1, C2, C3], [0, S1, S2, S3], [1, C1, C2, C3]).
-cruza(2, [S1, 2, S2, S3], [C1, 0, C2, C3], [S1, 0, S2, S3], [C1, 2, C2, C3]).
-cruza(5, [S1, S2, 5, S3], [C1, C2, 0, C3], [S1, S2, 0, S3], [C1, C2, 5, C3]).
-cruza(8, [S1, S2, S3, 8], [C1, C2, C3, 0], [S1, S2, S3, 0], [C1, C2, C3, 8]).
+cruza(X, [X | S1], [0 | C1], [0 | S1], [X | C1]).
+cruza(X, [Y | S1], [Z | C1], [Y | S2], [Z | C2]):- cruza(X, S1, C1, S2, C2).

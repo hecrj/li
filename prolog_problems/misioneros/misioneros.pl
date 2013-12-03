@@ -1,11 +1,10 @@
 :-include('../solver.pl').
 
-solve:- misioneros.
+solve:- misioneros(3, 3).
 
-misioneros:- solucionOptima(mision-i-[3, 3]-[0, 0], mision-d-[0, 0]-[3, 3]).
+misioneros(M, C):- solucionOptima(mision-i-[M, C]-[0, 0], mision-d-[0, 0]-[M, C]).
 
-coste([], 0).
-coste([mision-_-_-_|L], N):- coste(L, C), N is C + 1.
+coste(L, C):- length(L, C).
 
 compLado(0, _).
 compLado(M, C):- M >= C.
