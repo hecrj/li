@@ -8,6 +8,7 @@ camino(N, EstadoActual, EstadoFinal, CaminoHastaAhora, CaminoTotal ):-
 	\+contiene(EstSiguiente, CaminoHastaAhora),
 	camino(N, EstSiguiente, EstadoFinal, [EstSiguiente|CaminoHastaAhora], CaminoTotal ).
 
+% Solo podamos si el problema lo requiere.
 podar(_, _):- podar(0), !.
 podar(CaminoHastaAhora, N):- coste(CaminoHastaAhora, C), C =< N.
 
