@@ -34,24 +34,18 @@ display(Asignaciones-Coste):-
     write('    Hay que dar '), write(Coste), write(' charlas.'), nl,
     write('    Asignaciones:'), nl,
     display(Asignaciones),
+    write('----------------------------------------'), nl,
+    write('        En todos: '),
     enTodoSlot(Asignaciones, CharlasEnTodoSlot),
-    write('    Asignadas a todo slot: '),
-    display(CharlasEnTodoSlot), nl.
+    sort(CharlasEnTodoSlot, CharlasEnTodoSlotOrdenadas),
+    write(CharlasEnTodoSlotOrdenadas), nl.
 
 display([]).
 display([ (Slot, Charlas) | RestoAsignaciones]):-
-    write('        Slot '), write(Slot), write(': '),
+    write('        Slot '), write(Slot), write(':   '),
     sort(Charlas, CharlasOrdenadas),
-    display(CharlasOrdenadas), nl,
+    write(CharlasOrdenadas), nl,
     display(RestoAsignaciones).
-
-display([]).
-display([ Charla ]):-
-    write(Charla).
-
-display([ Charla1, Charla2 | RestoCharlas ]):-
-    write(Charla1), write(', '),
-    display([ Charla2 | RestoCharlas ]).
 
 enTodoSlot([ (_, Charlas) | RestoAsignaciones ], CharlasEnTodoSlot):-
     enTodoSlot(RestoAsignaciones, Charlas, CharlasEnTodoSlot).
