@@ -18,7 +18,6 @@ nat(N):- nat(X), N is X + 1.
 % selecciona aquella que tenga un menor numero de charlas en todos
 % los slots.
 solve:-
-    write('Computando...'), nl,
     inicial(Inicial),
     selecciones(Selecciones),
     nat(N),

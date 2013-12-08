@@ -1,7 +1,7 @@
 :-include('../solver.pl').
 podar(1). % Habilitar la poda al buscar solución
 
-solve:- puente([1, 2, 3, 4, 5]).
+solve:- puente([1, 2, 5, 8]).
 
 puente(P):-
 	ceros(P, Z),
