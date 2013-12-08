@@ -1,6 +1,6 @@
 :-include('../solver.pl').
 
-solve:- puente([1, 2, 4, 5, 8]).
+solve:- puente([1, 2, 5, 8]).
 
 puente(P):-
 	ceros(P, Z),

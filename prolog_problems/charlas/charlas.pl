@@ -12,15 +12,92 @@ nat(0).
 nat(N):- nat(X), N is X + 1.
 
 solve:-
-    nat(N).
+    inicial(Inicial),
+    write('Computando...'), nl,
+    selecciones(Selecciones),
+    nat(N),
+    solve(Inicial, Selecciones, N, Solucion),
+    coste(Solucion, Coste),
+    Coste =< N,
+    display(Solucion).
 
-asignar(Seleccion, Asignacion):-
-    asignar(Seleccion, [], Asignacion).
+solve(Actual, [], _, Actual).
+solve(Actual, [Charlas | RestoCharlas], N, Solucion):-
+    coste(Actual, Coste),
+    Coste =< N,
+    asignar(Charlas, Slots),
+    actualizar(Actual, Charlas, Slots, Siguiente),
+    solve(Siguiente, RestoCharlas, N, Solucion).
 
-asignar([], [], []).
-asignar([_ | L1], L2, [A | L3]):-
-    slots(S),
-    member(A, S),
-    \+member(A, L2),
-    asignar(L1, [A | L2], L3).
+display(Asignaciones-Coste):-
+    write('Solución:'), nl,
+    write('    Hay que dar '), write(Coste), write(' charlas.'), nl,
+    write('    Asignaciones:'), nl,
+    display(Asignaciones),
+    enTodoSlot(Asignaciones, CharlasEnTodoSlot),
+    write('    Asignadas a todo slot: '),
+    display(CharlasEnTodoSlot), nl.
 
+display([]).
+display([ (Slot, Charlas) | RestoAsignaciones]):-
+    write('        Slot '), write(Slot), write(': '),
+    sort(Charlas, CharlasOrdenadas),
+    display(CharlasOrdenadas), nl,
+    display(RestoAsignaciones).
+
+display([]).
+display([ Charla ]):-
+    write(Charla).
+
+display([ Charla1, Charla2 | RestoCharlas ]):-
+    write(Charla1), write(', '),
+    display([ Charla2 | RestoCharlas ]).
+
+enTodoSlot([ (_, Charlas) | RestoAsignaciones ], CharlasEnTodoSlot):-
+    enTodoSlot(RestoAsignaciones, Charlas, CharlasEnTodoSlot).
+
+enTodoSlot([], CharlasHastaAhora, CharlasHastaAhora).
+enTodoSlot([ (_, Charlas) | RestoAsignaciones], CharlasHastaAhora, CharlasEnTodoSlot):-
+    intersection(Charlas, CharlasHastaAhora, CharlasHastaAhora1),
+    enTodoSlot(RestoAsignaciones, CharlasHastaAhora1, CharlasEnTodoSlot).
+
+inicial(Inicial):-
+    slots(Slots),
+    inicial(Asignaciones, Slots),
+    Inicial = Asignaciones-0.
+
+inicial([], []).
+inicial([ (Slot, []) | RestoAsignaciones ], [ Slot | RestoSlots ]):- inicial(RestoAsignaciones, RestoSlots).
+
+coste(_-Coste, Coste).
+
+asignar(Charlas, Slots):-
+    asignar(Charlas, [], Slots).
+
+asignar([], _, []).
+asignar([_ | RestoCharlas], SlotsAsignados, [Slot | RestoSlots]):-
+    slots(Slots),
+    member(Slot, Slots),
+    \+member(Slot, SlotsAsignados),
+    asignar(RestoCharlas, [Slot | SlotsAsignados], RestoSlots).
+
+actualizar(Asignaciones-Coste, [], [], Asignaciones-Coste).
+actualizar(Asignaciones-Coste, [ Charla | RestoCharlas ], [ Slot | RestoSlots ], Siguiente-NuevoCoste):-
+    actualizar(Asignaciones, Coste, Charla, Slot, SiguienteParcial, NuevoCosteParcial),
+    actualizar(SiguienteParcial-NuevoCosteParcial, RestoCharlas, RestoSlots, Siguiente-NuevoCoste).
+
+actualizar([], Coste, _, _, [], Coste).
+actualizar([ Asignacion | RestoAsignaciones ], Coste, Charla, Slot, [ AsignacionNueva | RestoSiguiente ], NuevoCoste):-
+    programar(Asignacion, Coste, Charla, Slot, AsignacionNueva, CosteParcial),
+    actualizar(RestoAsignaciones, CosteParcial, Charla, Slot, RestoSiguiente, NuevoCoste).
+
+programar((Slot1, Charlas), Coste, _, Slot2, (Slot1, Charlas), Coste):-
+    Slot1 \= Slot2.
+
+programar((Slot, Charlas), Coste, Charla, Slot, (Slot, Charlas), Coste):-
+    member(Charla, Charlas).
+
+programar((Slot, Charlas), Coste, Charla, Slot, (Slot, NuevasCharlas), NuevoCoste):-
+    \+member(Charla, Charlas),
+    append([Charla], Charlas, NuevasCharlas),
+    NuevoCoste is Coste + 1.
