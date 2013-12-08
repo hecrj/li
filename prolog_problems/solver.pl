@@ -3,15 +3,16 @@ nat(N):- nat(X), N is X + 1.
 
 camino(_, E,E, C,C ).
 camino(N, EstadoActual, EstadoFinal, CaminoHastaAhora, CaminoTotal ):-
-	coste(CaminoHastaAhora, C), C =< N,
+	podar(CaminoHastaAhora, N),
 	unPaso( EstadoActual, EstSiguiente ),
-	\+member(EstSiguiente, CaminoHastaAhora),
-	%write(CaminoHastaAhora), write(C), nl,
+	\+contiene(EstSiguiente, CaminoHastaAhora),
 	camino(N, EstSiguiente, EstadoFinal, [EstSiguiente|CaminoHastaAhora], CaminoTotal ).
 
+podar(_, _):- podar(0), !.
+podar(CaminoHastaAhora, N):- coste(CaminoHastaAhora, C), C =< N.
+
 solucionOptima(I, F):-
-	nat(N), % Buscamos solucion de "coste" 0; si no, de 1, etc.
-	write(N), nl,
+	nat(N),
 	camino(N, I, F, [I], C),
 	coste(C, N),
 	reverse(C, R),

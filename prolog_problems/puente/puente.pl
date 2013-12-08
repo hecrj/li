@@ -1,6 +1,7 @@
 :-include('../solver.pl').
+podar(1). % Habilitar la poda al buscar solución
 
-solve:- puente([1, 2, 5, 8]).
+solve:- puente([1, 2, 3, 4, 5]).
 
 puente(P):-
 	ceros(P, Z),
@@ -12,6 +13,9 @@ ceros([_ | P], [0 | Z]):- ceros(P, Z).
 coste([], 0).
 coste([puente-_-_-_-C], C).
 coste([puente-_-_-_-C | _], C).
+
+contiene(puente-Lado-SinCruzar-Cruzado-_, [ puente-Lado-SinCruzar-Cruzado-_ | _ ]).
+contiene(X, [ _ | Resto ]):- contiene(X, Resto).
 
 unPaso(puente-i-SinCruzar1-Cruzado1-C1, puente-d-SinCruzar2-Cruzado2-C2):-
 	cruzar(SinCruzar1, Cruzado1, C1, SinCruzar2, Cruzado2, C2).

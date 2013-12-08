@@ -1,4 +1,5 @@
 :-include('../solver.pl').
+podar(0).
 
 capacidad(5, 8).
 
@@ -7,6 +8,8 @@ cubos:- solucionOptima(cubos-0-0, cubos-0-4).
 
 coste([], 0).
 coste([cubos-_-_|L], N):- coste(L, C), N is C + 1.
+
+contiene(Estado, Camino):- member(Estado, Camino).
 
 unPaso(cubos-X-_, cubos-X-0).
 unPaso(cubos-_-X, cubos-0-X).
