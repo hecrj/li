@@ -1,8 +1,8 @@
-En el directorio prolog_problems se incluye el archivo:
+Se incluye el archivo:
     solver.pl: Contiene la estructura básica que comparten los problemas (cubos, misioneros y puentes).
                Es lo suficientemente flexible como para adaptarse a las características del problema.
 
-Además, se encuentran los siguientes directorios:
+Además, se incluyen los siguientes directorios:
     doc: Contiene un documento PDF con la descripción de los problemas a resolver.
     cubos, misioneros, puente y charlas: Resuelven los problemas descritos en el PDF anterior.
 
