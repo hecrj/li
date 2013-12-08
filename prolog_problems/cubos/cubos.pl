@@ -6,8 +6,7 @@ capacidad(5, 8).
 solve:- cubos.
 cubos:- solucionOptima(cubos-0-0, cubos-0-4).
 
-coste([], 0).
-coste([cubos-_-_|L], N):- coste(L, C), N is C + 1.
+coste(L, C):- length(L, C).
 
 contiene(Estado, Camino):- member(Estado, Camino).
 
